@@ -5,7 +5,11 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   output: "standalone",
+  serverExternalPackages: ["pdfjs-dist"],
   turbopack: {
+    resolveAlias: {
+      canvas: "./src/lib/pdf/empty-canvas.js",
+    },
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],
