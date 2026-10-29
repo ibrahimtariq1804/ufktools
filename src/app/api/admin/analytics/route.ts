@@ -3,16 +3,12 @@ import { getAdminSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 
 export async function GET(request: Request) {
-  let session = null;
-  try {
-    session = await getAdminSession();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
-  }
-
+  const session = await getAdminSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
   }
+
+  try {
 
     const { searchParams } = new URL(request.url);
     const rangeParam = searchParams.get("range") || "7d";
