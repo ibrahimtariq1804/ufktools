@@ -51,15 +51,40 @@ let pgPool: Pool | null = null;
 if (process.env.DATABASE_URL) {
   pgPool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+    ssl: process.env.DATABASE_SSL === "false" ? false : { rejectUnauthorized: false },
   });
 }
 
-let ensuredAnalyticsTable = false;
-async function ensurePgAnalyticsTable() {
-  if (!pgPool || ensuredAnalyticsTable) return;
+let ensuredPgSchema = false;
+async function ensurePgTables() {
+  if (!pgPool || ensuredPgSchema) return;
   try {
     await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS admins (
+        id VARCHAR(64) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_login_at TIMESTAMP WITH TIME ZONE
+      );
+
+      CREATE TABLE IF NOT EXISTS featured_posts (
+        id VARCHAR(64) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        fact TEXT NOT NULL,
+        image_url VARCHAR(500) NOT NULL,
+        image_filename VARCHAR(255) NOT NULL,
+        thumbnail_url VARCHAR(500),
+        youtube_url VARCHAR(500),
+        is_featured BOOLEAN NOT NULL DEFAULT FALSE,
+        published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(64),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS analytics_events (
         id VARCHAR(64) PRIMARY KEY,
         event_type VARCHAR(32) NOT NULL DEFAULT 'pageview',
@@ -80,9 +105,23 @@ async function ensurePgAnalyticsTable() {
       CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);
       CREATE INDEX IF NOT EXISTS idx_analytics_country ON analytics_events(country_code);
     `);
-    ensuredAnalyticsTable = true;
+
+    // Ensure initial admin user exists
+    const check = await pgPool.query("SELECT COUNT(*) FROM admins");
+    if (parseInt(check.rows[0].count, 10) === 0) {
+      const initialEmail = process.env.ADMIN_EMAIL || "admin@ufktools.com";
+      const initialPassword = process.env.ADMIN_PASSWORD || "admin123";
+      const initialName = process.env.ADMIN_NAME || "UFK Administrator";
+      const hash = bcrypt.hashSync(initialPassword, 10);
+      await pgPool.query(
+        "INSERT INTO admins (id, email, password_hash, name) VALUES ($1, $2, $3, $4)",
+        [crypto.randomUUID(), initialEmail, hash, initialName]
+      );
+    }
+
+    ensuredPgSchema = true;
   } catch (err) {
-    console.error("Error ensuring analytics table in PostgreSQL:", err);
+    console.error("Error ensuring PostgreSQL tables:", err);
   }
 }
 
@@ -129,6 +168,17 @@ function ensureLocalStore(): LocalStore {
     try {
       const raw = fs.readFileSync(storeFile, "utf-8");
       const parsed = JSON.parse(raw) as LocalStore;
+      if (!parsed.admins || parsed.admins.length === 0) {
+        parsed.admins = [
+          {
+            id: "admin-default-uuid",
+            email: process.env.ADMIN_EMAIL || "admin@ufktools.com",
+            passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD || "admin123", 10),
+            name: process.env.ADMIN_NAME || "UFK Administrator",
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      }
       if (!parsed.analytics) parsed.analytics = [];
       return parsed;
     } catch {}
@@ -138,6 +188,17 @@ function ensureLocalStore(): LocalStore {
     try {
       const raw = fs.readFileSync(bundledFile, "utf-8");
       const parsed = JSON.parse(raw) as LocalStore;
+      if (!parsed.admins || parsed.admins.length === 0) {
+        parsed.admins = [
+          {
+            id: "admin-default-uuid",
+            email: process.env.ADMIN_EMAIL || "admin@ufktools.com",
+            passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD || "admin123", 10),
+            name: process.env.ADMIN_NAME || "UFK Administrator",
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      }
       if (!parsed.analytics) parsed.analytics = [];
       try {
         fs.writeFileSync(storeFile, JSON.stringify(parsed, null, 2), "utf-8");
@@ -203,11 +264,16 @@ export const db = {
   // Admin Operations
   async getAdminByEmail(email: string): Promise<AdminUser | null> {
     if (pgPool) {
-      const res = await pgPool.query(
-        "SELECT id, email, password_hash as \"passwordHash\", name, created_at as \"createdAt\", last_login_at as \"lastLoginAt\" FROM admins WHERE LOWER(email) = LOWER($1)",
-        [email]
-      );
-      return res.rows[0] || null;
+      try {
+        await ensurePgTables();
+        const res = await pgPool.query(
+          "SELECT id, email, password_hash as \"passwordHash\", name, created_at as \"createdAt\", last_login_at as \"lastLoginAt\" FROM admins WHERE LOWER(email) = LOWER($1)",
+          [email]
+        );
+        if (res.rows[0]) return res.rows[0];
+      } catch (err) {
+        console.error("PostgreSQL query error in getAdminByEmail, falling back to local store:", err);
+      }
     }
 
     const store = ensureLocalStore();
@@ -218,11 +284,16 @@ export const db = {
 
   async getAdminById(id: string): Promise<AdminUser | null> {
     if (pgPool) {
-      const res = await pgPool.query(
-        "SELECT id, email, password_hash as \"passwordHash\", name, created_at as \"createdAt\", last_login_at as \"lastLoginAt\" FROM admins WHERE id = $1",
-        [id]
-      );
-      return res.rows[0] || null;
+      try {
+        await ensurePgTables();
+        const res = await pgPool.query(
+          "SELECT id, email, password_hash as \"passwordHash\", name, created_at as \"createdAt\", last_login_at as \"lastLoginAt\" FROM admins WHERE id = $1",
+          [id]
+        );
+        if (res.rows[0]) return res.rows[0];
+      } catch (err) {
+        console.error("PostgreSQL query error in getAdminById, falling back to local store:", err);
+      }
     }
 
     const store = ensureLocalStore();
@@ -234,12 +305,16 @@ export const db = {
     const cleanName = name.trim();
 
     if (pgPool) {
-      const res = await pgPool.query(
-        "UPDATE admins SET name = $1, email = $2 WHERE id = $3 RETURNING id, email, password_hash as \"passwordHash\", name, created_at as \"createdAt\", last_login_at as \"lastLoginAt\"",
-        [cleanName, cleanEmail, id]
-      );
-      if (!res.rows[0]) throw new Error("Admin user not found");
-      return res.rows[0];
+      try {
+        await ensurePgTables();
+        const res = await pgPool.query(
+          "UPDATE admins SET name = $1, email = $2 WHERE id = $3 RETURNING id, email, password_hash as \"passwordHash\", name, created_at as \"createdAt\", last_login_at as \"lastLoginAt\"",
+          [cleanName, cleanEmail, id]
+        );
+        if (res.rows[0]) return res.rows[0];
+      } catch (err) {
+        console.error("PostgreSQL query error in updateAdminProfile, falling back to local store:", err);
+      }
     }
 
     const store = ensureLocalStore();
@@ -261,8 +336,13 @@ export const db = {
 
   async updateAdminPassword(id: string, passwordHash: string): Promise<void> {
     if (pgPool) {
-      await pgPool.query("UPDATE admins SET password_hash = $1 WHERE id = $2", [passwordHash, id]);
-      return;
+      try {
+        await ensurePgTables();
+        await pgPool.query("UPDATE admins SET password_hash = $1 WHERE id = $2", [passwordHash, id]);
+        return;
+      } catch (err) {
+        console.error("PostgreSQL query error in updateAdminPassword, falling back to local store:", err);
+      }
     }
 
     const store = ensureLocalStore();
@@ -276,8 +356,13 @@ export const db = {
   async updateAdminLogin(id: string): Promise<void> {
     const now = new Date().toISOString();
     if (pgPool) {
-      await pgPool.query("UPDATE admins SET last_login_at = $1 WHERE id = $2", [now, id]);
-      return;
+      try {
+        await ensurePgTables();
+        await pgPool.query("UPDATE admins SET last_login_at = $1 WHERE id = $2", [now, id]);
+        return;
+      } catch (err) {
+        console.error("PostgreSQL query error in updateAdminLogin, falling back to local store:", err);
+      }
     }
 
     const store = ensureLocalStore();
@@ -516,7 +601,7 @@ export const db = {
 
     if (pgPool) {
       try {
-        await ensurePgAnalyticsTable();
+        await ensurePgTables();
         await pgPool.query(
           `INSERT INTO analytics_events (
             id, event_type, path, tool_slug, action, country_code, city, region,
@@ -573,7 +658,7 @@ export const db = {
 
     if (pgPool) {
       try {
-        await ensurePgAnalyticsTable();
+        await ensurePgTables();
         const eventsRes = await pgPool.query(
           "SELECT * FROM analytics_events WHERE created_at >= $1 ORDER BY created_at DESC",
           [cutoffIso]
