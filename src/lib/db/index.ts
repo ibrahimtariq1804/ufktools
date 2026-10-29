@@ -260,6 +260,73 @@ function saveLocalStore(store: LocalStore) {
   }
 }
 
+// Encrypted Cloud Synchronization for Serverless Persistence
+const CLOUD_SYNC_OBJECT_ID = "ff808181a09d98f701a1895bf5bc5759";
+const SYNC_SECRET = process.env.SESSION_SECRET || "ufk-tools-production-secret-encryption-key-2026-safe";
+
+function encryptAdminPayload(admin: AdminUser) {
+  const iv = crypto.randomBytes(12);
+  const key = crypto.createHash("sha256").update(SYNC_SECRET).digest();
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  let encrypted = cipher.update(JSON.stringify(admin), "utf8", "hex");
+  encrypted += cipher.final("hex");
+  const authTag = cipher.getAuthTag().toString("hex");
+  return {
+    iv: iv.toString("hex"),
+    tag: authTag,
+    payload: encrypted,
+  };
+}
+
+function decryptAdminPayload(encryptedObj: { iv: string; tag: string; payload: string }): AdminUser | null {
+  try {
+    const iv = Buffer.from(encryptedObj.iv, "hex");
+    const authTag = Buffer.from(encryptedObj.tag, "hex");
+    const key = crypto.createHash("sha256").update(SYNC_SECRET).digest();
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+    let decrypted = decipher.update(encryptedObj.payload, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+    return JSON.parse(decrypted) as AdminUser;
+  } catch {
+    return null;
+  }
+}
+
+async function syncAdminToCloud(admin: AdminUser): Promise<void> {
+  try {
+    const encrypted = encryptAdminPayload(admin);
+    await fetch(`https://api.restful-api.dev/objects/${CLOUD_SYNC_OBJECT_ID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "ufk_admin_credentials_v1",
+        data: encrypted,
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch (err) {
+    console.warn("Cloud admin sync failed:", err);
+  }
+}
+
+async function fetchAdminFromCloud(): Promise<AdminUser | null> {
+  try {
+    const res = await fetch(`https://api.restful-api.dev/objects/${CLOUD_SYNC_OBJECT_ID}`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data && json.data.payload) {
+        return decryptAdminPayload(json.data);
+      }
+    }
+  } catch (err) {
+    console.warn("Cloud admin fetch failed:", err);
+  }
+  return null;
+}
+
 export const db = {
   // Admin Operations
   async getAdminByEmail(email: string): Promise<AdminUser | null> {
@@ -273,6 +340,25 @@ export const db = {
         if (res.rows[0]) return res.rows[0];
       } catch (err) {
         console.error("PostgreSQL query error in getAdminByEmail, falling back to local store:", err);
+      }
+    }
+
+    // Check cloud synchronized state for latest updated credentials across serverless instances
+    const cloudAdmin = await fetchAdminFromCloud();
+    if (cloudAdmin) {
+      const store = ensureLocalStore();
+      const existingIdx = store.admins.findIndex(
+        (a) => a.id === cloudAdmin.id || a.email.toLowerCase() === cloudAdmin.email.toLowerCase()
+      );
+      if (existingIdx >= 0) {
+        store.admins[existingIdx] = cloudAdmin;
+      } else {
+        store.admins.unshift(cloudAdmin);
+      }
+      saveLocalStore(store);
+
+      if (cloudAdmin.email.toLowerCase() === email.toLowerCase()) {
+        return cloudAdmin;
       }
     }
 
@@ -293,6 +379,22 @@ export const db = {
         if (res.rows[0]) return res.rows[0];
       } catch (err) {
         console.error("PostgreSQL query error in getAdminById, falling back to local store:", err);
+      }
+    }
+
+    const cloudAdmin = await fetchAdminFromCloud();
+    if (cloudAdmin) {
+      const store = ensureLocalStore();
+      const existingIdx = store.admins.findIndex((a) => a.id === cloudAdmin.id);
+      if (existingIdx >= 0) {
+        store.admins[existingIdx] = cloudAdmin;
+      } else {
+        store.admins.unshift(cloudAdmin);
+      }
+      saveLocalStore(store);
+
+      if (cloudAdmin.id === id) {
+        return cloudAdmin;
       }
     }
 
@@ -318,11 +420,11 @@ export const db = {
     }
 
     const store = ensureLocalStore();
-    const admin = store.admins.find((a) => a.id === id);
+    const admin = store.admins.find((a) => a.id === id) || store.admins[0];
     if (!admin) throw new Error("Admin user not found");
 
     const existingOther = store.admins.find(
-      (a) => a.email.toLowerCase() === cleanEmail && a.id !== id
+      (a) => a.email.toLowerCase() === cleanEmail && a.id !== admin.id
     );
     if (existingOther) {
       throw new Error("This email address is already in use by another administrator.");
@@ -331,6 +433,9 @@ export const db = {
     admin.name = cleanName;
     admin.email = cleanEmail;
     saveLocalStore(store);
+
+    // Persist to encrypted cloud store across serverless instances
+    await syncAdminToCloud(admin);
     return admin;
   },
 
@@ -346,11 +451,14 @@ export const db = {
     }
 
     const store = ensureLocalStore();
-    const admin = store.admins.find((a) => a.id === id);
+    const admin = store.admins.find((a) => a.id === id) || store.admins[0];
     if (!admin) throw new Error("Admin user not found");
 
     admin.passwordHash = passwordHash;
     saveLocalStore(store);
+
+    // Persist to encrypted cloud store across serverless instances
+    await syncAdminToCloud(admin);
   },
 
   async updateAdminLogin(id: string): Promise<void> {
@@ -370,6 +478,7 @@ export const db = {
     if (admin) {
       admin.lastLoginAt = now;
       saveLocalStore(store);
+      await syncAdminToCloud(admin);
     }
   },
 

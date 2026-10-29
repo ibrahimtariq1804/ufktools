@@ -31,13 +31,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const defaultPassword = process.env.ADMIN_PASSWORD || "admin123";
-    const defaultEmail = (process.env.ADMIN_EMAIL || "admin@ufktools.com").toLowerCase();
-
-    let admin = await db.getAdminByEmail(email);
-    if (!admin && email.trim().toLowerCase() === defaultEmail) {
-      admin = await db.getAdminByEmail(defaultEmail);
-    }
+    const admin = await db.getAdminByEmail(email.trim());
 
     if (!admin) {
       return NextResponse.json(
@@ -46,17 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    let isMatch = await bcrypt.compare(password, admin.passwordHash);
-    if (!isMatch && email.trim().toLowerCase() === defaultEmail && password === defaultPassword) {
-      isMatch = true;
-      try {
-        const newHash = await bcrypt.hash(defaultPassword, 10);
-        await db.updateAdminPassword(admin.id, newHash);
-      } catch (err) {
-        console.warn("Failed to auto-update admin password hash:", err);
-      }
-    }
-
+    const isMatch = await bcrypt.compare(password, admin.passwordHash);
     if (!isMatch) {
       return NextResponse.json(
         { error: "Invalid email or password." },

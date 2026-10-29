@@ -13,16 +13,13 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  Key,
-  Sparkles,
 } from "lucide-react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@ufktools.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showHelper, setShowHelper] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -33,17 +30,10 @@ export default function AdminLoginPage() {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("ufk_admin_email_pref");
       if (saved) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setEmail(saved);
       }
     }
   }, []);
-
-  const handleFillDemo = () => {
-    setEmail("admin@ufktools.com");
-    setPassword("admin123");
-    setErrorMessage(null);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,38 +167,6 @@ export default function AdminLoginPage() {
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
-
-          {/* Initial Setup Credentials Box */}
-          <div className="mt-6 pt-5 border-t border-slate-800 text-center">
-            <button
-              type="button"
-              onClick={() => setShowHelper(!showHelper)}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-            >
-              <Key className="h-3 w-3 text-blue-400" />
-              <span>{showHelper ? "Hide initial login credentials" : "Show initial login credentials"}</span>
-            </button>
-
-            {showHelper && (
-              <div className="mt-3 text-left rounded-xl bg-slate-950 p-4 border border-slate-800 text-xs space-y-2 animate-in fade-in">
-                <div className="flex items-center gap-1.5 font-semibold text-blue-400 text-[11px]">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  <span>Default Initial Credentials</span>
-                </div>
-                <div className="rounded-lg bg-slate-900 p-2 font-mono text-[11px] text-slate-300 space-y-1 border border-slate-800/80">
-                  <div>Email: <span className="text-white font-semibold">admin@ufktools.com</span></div>
-                  <div>Password: <span className="text-white font-semibold">admin123</span></div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleFillDemo}
-                  className="w-full mt-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 text-center py-2 font-semibold text-[11px] transition-colors border border-blue-500/30 cursor-pointer"
-                >
-                  Auto-fill Initial Credentials
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
