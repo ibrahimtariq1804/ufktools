@@ -10,7 +10,6 @@ import {
   Sparkles,
   ChevronDown,
   Wrench,
-  Shield,
   ArrowRight,
 } from "lucide-react";
 import { CATEGORIES } from "@/config/tools.config";
@@ -154,14 +153,7 @@ export function Header() {
               <span>@UFK</span>
             </a>
 
-            {/* Admin Portal Link */}
-            <Link
-              href="/admin/login"
-              className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-xl transition-colors"
-            >
-              <Shield className="h-3.5 w-3.5" />
-              <span>Admin</span>
-            </Link>
+
 
             {/* Mobile Menu Toggle */}
             <button
@@ -210,14 +202,7 @@ export function Header() {
               >
                 About UFK Tools
               </Link>
-              <Link
-                href="/admin/login"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-base font-medium text-slate-600 rounded-lg hover:bg-slate-50"
-              >
-                <Shield className="h-4 w-4" />
-                Admin Portal
-              </Link>
+
               <a
                 href="https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8"
                 target="_blank"

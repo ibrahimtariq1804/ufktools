@@ -184,11 +184,6 @@ export function Footer() {
                   Terms of Service
                 </Link>
               </li>
-              <li>
-                <Link href="/admin/login" className="hover:text-white transition-colors text-slate-500">
-                  Admin Login
-                </Link>
-              </li>
             </ul>
           </div>
         </div>
