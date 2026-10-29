@@ -37,11 +37,19 @@ function parseUserAgent(ua: string) {
   return { deviceType, browser, os };
 }
 
+interface TrackPayload {
+  eventType?: "pageview" | "tool_action";
+  path?: string;
+  toolSlug?: string;
+  action?: string;
+  referrer?: string;
+}
+
 export async function POST(req: Request) {
   try {
-    let body: any = {};
+    let body: TrackPayload = {};
     try {
-      body = await req.json();
+      body = (await req.json()) as TrackPayload;
     } catch {
       // Body might be empty or beacon text
     }

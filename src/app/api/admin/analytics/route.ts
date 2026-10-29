@@ -2,14 +2,17 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 
-export const dynamic = "force-dynamic";
-
 export async function GET(request: Request) {
+  let session = null;
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
-    }
+    session = await getAdminSession();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
+  }
+
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
+  }
 
     const { searchParams } = new URL(request.url);
     const rangeParam = searchParams.get("range") || "7d";

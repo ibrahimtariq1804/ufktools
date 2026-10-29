@@ -107,9 +107,9 @@ export default function AnalyticsDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
 
-  const fetchAnalytics = (selectedRange: "today" | "7d" | "30d" | "all") => {
+  const handleRefresh = () => {
     setIsLoading(true);
-    fetch(`/api/admin/analytics?range=${selectedRange}`)
+    fetch(`/api/admin/analytics?range=${range}`)
       .then((res) => {
         if (!res.ok) throw new Error("Unauthorized or failed request");
         return res.json();
@@ -129,7 +129,29 @@ export default function AnalyticsDashboardPage() {
   };
 
   useEffect(() => {
-    fetchAnalytics(range);
+    let ignore = false;
+
+    fetch(`/api/admin/analytics?range=${range}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Unauthorized or failed request");
+        return res.json();
+      })
+      .then((json) => {
+        if (!ignore && json.data) {
+          setData(json.data);
+          setLastRefreshed(new Date().toLocaleTimeString());
+        }
+      })
+      .catch((err) => {
+        if (!ignore) console.error("Failed to load analytics:", err);
+      })
+      .finally(() => {
+        if (!ignore) setIsLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [range]);
 
   const totalDevices =
@@ -186,7 +208,7 @@ export default function AnalyticsDashboardPage() {
 
           {/* Refresh Button */}
           <button
-            onClick={() => fetchAnalytics(range)}
+            onClick={handleRefresh}
             disabled={isLoading}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-50 cursor-pointer"
             title="Refresh analytics data"
