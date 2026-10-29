@@ -33,21 +33,20 @@ export async function POST(req: Request) {
                 {
                   parts: [
                     {
-                      text: `You are an expert executive document analyst. Analyze this document (${totalPages} pages, ~${wordCount} words).
-Provide a sharp, to-the-point, and highly structured summary strictly in JSON format. Do not include vague filler phrases or markdown code fences.
-
-JSON Structure:
+                      text: `You are an expert AI document analyst like ChatGPT. Analyze this document (${totalPages} pages, ~${wordCount} words).
+Provide a clear, conversational, and highly structured summary strictly in JSON format matching this schema:
 {
-  "overview": "A clear, authoritative 2-sentence overview stating the specific subject/candidate/purpose and core competencies or scope",
+  "overview": "A clear, authoritative 2-3 sentence overview explaining what this document is, what it covers, and its purpose.",
   "keyFindings": [
-    "First crucial finding, metric, or requirement with exact numbers if present",
-    "Second crucial finding, metric, or requirement",
-    "Third crucial finding, metric, or requirement",
-    "Fourth crucial finding, metric, or requirement"
+    "First core topic explained clearly with key concepts and practical examples",
+    "Second core topic explained clearly with key concepts and practical examples",
+    "Third core topic explained clearly with key concepts and practical examples",
+    "Fourth core topic explained clearly with key concepts and practical examples"
   ],
-  "conclusions": "Crisp actionable takeaway or final qualification verdict",
+  "conclusions": "Crisp actionable takeaway or final conclusion",
   "keywords": [{"word": "topic1", "count": 10}, {"word": "topic2", "count": 8}]
 }
+Return raw JSON only without markdown code fences.
 
 Document Content:
 ${text.slice(0, 32000)}`,
@@ -56,7 +55,7 @@ ${text.slice(0, 32000)}`,
                 },
               ],
               generationConfig: {
-                temperature: 0.15,
+                temperature: 0.2,
                 responseMimeType: "application/json",
               },
             }),
@@ -68,7 +67,8 @@ ${text.slice(0, 32000)}`,
           const data = await geminiRes.json();
           const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (raw) {
-            const parsed = JSON.parse(raw);
+            const clean = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+            const parsed = JSON.parse(clean);
             return NextResponse.json({
               success: true,
               engine: "gemini",
@@ -78,7 +78,7 @@ ${text.slice(0, 32000)}`,
           }
         }
       } catch (err) {
-        console.warn("Gemini summarization failed, falling back to local NLP:", err);
+        console.warn("Gemini summarization failed, falling back to smart NLP:", err);
       }
     }
 
@@ -98,11 +98,11 @@ ${text.slice(0, 32000)}`,
               {
                 role: "system",
                 content:
-                  'You are an expert document analyst. Return a JSON object with: {"overview": string, "keyFindings": string[], "conclusions": string, "keywords": [{"word": string, "count": number}]}. Be to-the-point and factual.',
+                  'You are an expert document analyst like ChatGPT. Return a JSON object with: {"overview": string, "keyFindings": string[], "conclusions": string, "keywords": [{"word": string, "count": number}]}. Be clear, educational, and structured.',
               },
               {
                 role: "user",
-                content: `Analyze this document (${totalPages} pages):\n\n${text.slice(0, 28000)}`,
+                content: `Analyze and explain this document (${totalPages} pages):\n\n${text.slice(0, 28000)}`,
               },
             ],
             temperature: 0.2,
@@ -124,57 +124,16 @@ ${text.slice(0, 32000)}`,
           }
         }
       } catch (err) {
-        console.warn("OpenAI summarization failed, falling back to local NLP:", err);
+        console.warn("OpenAI summarization failed, falling back to smart NLP:", err);
       }
     }
 
-    // 3. High-Speed Cloud LLM Proxy (Free tier with 4s timeout)
-    try {
-      const freeLlmRes = await fetch("https://text.pollinations.ai/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "system",
-              content: `You are an expert document analyst. Return ONLY a valid JSON object without backticks or markdown:
-{"overview": "2-sentence executive summary with specific names, titles, and scope", "keyFindings": ["Finding 1 with exact numbers", "Finding 2", "Finding 3", "Finding 4"], "conclusions": "Crisp verdict or takeaway", "keywords": [{"word": "key1", "count": 5}]}`,
-            },
-            {
-              role: "user",
-              content: `Document Content:\n\n${text.slice(0, 16000)}`,
-            },
-          ],
-          model: "openai",
-          jsonMode: true,
-        }),
-        signal: AbortSignal.timeout(4500),
-      });
-
-      if (freeLlmRes.ok) {
-        const rawText = await freeLlmRes.text();
-        // Clean possible markdown code fences
-        const cleanJson = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-        const parsed = JSON.parse(cleanJson);
-        if (parsed.overview && Array.isArray(parsed.keyFindings) && parsed.keyFindings.length > 0) {
-          return NextResponse.json({
-            success: true,
-            engine: "cloud-llm",
-            engineLabel: "High-Precision Cloud AI (Free)",
-            summary: parsed,
-          });
-        }
-      }
-    } catch {
-      // Gracefully fall through to smart NLP engine
-    }
-
-    // 4. Built-in High-Accuracy Semantic NLP Summarizer (Entity & structure-aware)
+    // 3. Built-in High-Accuracy ChatGPT-Style Semantic NLP Engine (Instant & 100% Free)
     const nlpSummary = generateSmartSummary(text, totalPages);
     return NextResponse.json({
       success: true,
       engine: "built-in-nlp",
-      engineLabel: "UFK Intelligent NLP Engine (100% Free)",
+      engineLabel: "UFK Intelligent AI Engine (100% Free)",
       summary: nlpSummary,
     });
   } catch (error) {

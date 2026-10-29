@@ -38,6 +38,28 @@ interface ChatMessage {
   timestamp: string;
 }
 
+function renderFormattedText(text: string) {
+  if (!text) return null;
+  const lines = text.split("\n");
+  return lines.map((line, lIdx) => {
+    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <span key={lIdx} className="block min-h-[1.25em]">
+        {parts.map((part, pIdx) => {
+          if (part.startsWith("**") && part.endsWith("**")) {
+            return (
+              <strong key={pIdx} className="font-bold text-slate-900">
+                {part.slice(2, -2)}
+              </strong>
+            );
+          }
+          return part;
+        })}
+      </span>
+    );
+  });
+}
+
 export function ChatPdfTool({ tool }: ChatPdfToolProps) {
   const category = CATEGORIES.find((c) => c.id === tool.category);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -524,9 +546,9 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                         <Sparkles className="h-4 w-4 text-blue-600" />
                         <span>Executive Document Abstract</span>
                       </div>
-                      <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-normal">
-                        {executiveOverview}
-                      </p>
+                      <div className="text-xs sm:text-sm text-slate-800 leading-relaxed font-normal space-y-1">
+                        {renderFormattedText(executiveOverview)}
+                      </div>
                     </div>
                   )}
 
@@ -568,7 +590,9 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700 mt-0.5">
                             {idx + 1}
                           </span>
-                          <p className="text-xs sm:text-sm text-slate-800 leading-relaxed">{bullet}</p>
+                          <div className="text-xs sm:text-sm text-slate-800 leading-relaxed space-y-1">
+                            {renderFormattedText(bullet)}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -581,9 +605,9 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         <span>Actionable Takeaways & Conclusions</span>
                       </div>
-                      <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-                        {conclusions}
-                      </p>
+                      <div className="text-xs sm:text-sm text-slate-700 leading-relaxed space-y-1">
+                        {renderFormattedText(conclusions)}
+                      </div>
                     </div>
                   )}
 
@@ -616,7 +640,9 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                               : "bg-white text-slate-800 border border-slate-200 rounded-bl-xs shadow-xs"
                           }`}
                         >
-                          <p>{msg.text}</p>
+                          <div className="text-xs sm:text-sm leading-relaxed space-y-1">
+                            {renderFormattedText(msg.text)}
+                          </div>
                           {msg.citedPage && (
                             <div className="mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-blue-600 font-semibold flex items-center gap-1">
                               <BookOpen className="h-3 w-3" />

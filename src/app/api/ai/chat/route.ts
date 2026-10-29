@@ -63,8 +63,8 @@ export async function POST(req: Request) {
                 {
                   parts: [
                     {
-                      text: `You are an expert document assistant. Answer the user's question directly, accurately, and to the point using only the provided document excerpts.
-State the direct answer immediately in your first sentence. Include the specific page number where the answer is found. Do not invent facts not in the text.
+                      text: `You are an expert AI document assistant like ChatGPT. Answer the user's question directly, conversationally, and accurately using only the provided document excerpts.
+Format your answer with clear markdown (bold terms, bullet points) when explaining concepts or lists. State the relevant page number. Do not make up facts.
 
 Document Excerpts:
 ${contextText.slice(0, 18000)}
@@ -75,8 +75,8 @@ User Question: ${cleanQuery}`,
                 },
               ],
               generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 500,
+                temperature: 0.2,
+                maxOutputTokens: 600,
               },
             }),
             signal: AbortSignal.timeout(9000),
@@ -97,7 +97,7 @@ User Question: ${cleanQuery}`,
           }
         }
       } catch (err) {
-        console.warn("Gemini chat error, falling back to local NLP:", err);
+        console.warn("Gemini chat error, falling back to smart NLP:", err);
       }
     }
 
@@ -115,7 +115,7 @@ User Question: ${cleanQuery}`,
             messages: [
               {
                 role: "system",
-                content: `You are an expert document assistant. Answer the question directly and concisely based on the excerpts. Always state the relevant page number.\n\nDocument Excerpts:\n${contextText.slice(0, 16000)}`,
+                content: `You are an expert AI document assistant like ChatGPT. Answer the question directly, conversationally, and accurately based on the excerpts. Use markdown bullet points and bolding for clarity. Always state the relevant page number.\n\nDocument Excerpts:\n${contextText.slice(0, 16000)}`,
               },
               ...history.slice(-3).map((h) => ({
                 role: h.sender === "user" ? ("user" as const) : ("assistant" as const),
@@ -124,7 +124,7 @@ User Question: ${cleanQuery}`,
               { role: "user" as const, content: cleanQuery },
             ],
             temperature: 0.2,
-            max_tokens: 400,
+            max_tokens: 500,
           }),
           signal: AbortSignal.timeout(9000),
         });
@@ -143,54 +143,16 @@ User Question: ${cleanQuery}`,
           }
         }
       } catch (err) {
-        console.warn("OpenAI chat error, falling back to local NLP:", err);
+        console.warn("OpenAI chat error, falling back to smart NLP:", err);
       }
     }
 
-    // 3. High-Speed Cloud LLM Proxy (Free tier with 4s timeout)
-    try {
-      const freeLlmRes = await fetch("https://text.pollinations.ai/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "system",
-              content: `You are an expert document assistant. Answer the user's question directly, accurately, and to the point using only the provided document excerpts. State the specific answer immediately with numbers/names if applicable. State the page number where the answer is found. Do not make up facts.\n\nDocument Excerpts:\n${contextText.slice(0, 14000)}`,
-            },
-            {
-              role: "user",
-              content: cleanQuery,
-            },
-          ],
-          model: "openai",
-        }),
-        signal: AbortSignal.timeout(4500),
-      });
-
-      if (freeLlmRes.ok) {
-        const textAnswer = await freeLlmRes.text();
-        // Check if valid answer (not rate limit notice)
-        if (textAnswer && !textAnswer.toLowerCase().includes("free limit reached")) {
-          return NextResponse.json({
-            success: true,
-            engine: "cloud-llm",
-            engineLabel: "High-Precision Cloud AI (Free)",
-            answer: textAnswer.trim(),
-            citedPage: primaryChunk.page,
-          });
-        }
-      }
-    } catch {
-      // Gracefully fall through to smart NLP engine
-    }
-
-    // 4. Built-in Entity-Aware Semantic Answer Engine
+    // 3. Built-in Entity-Aware Semantic Answer Engine (Instant & 100% Free)
     const localResult = answerDocumentQuery(cleanQuery, chunks);
     return NextResponse.json({
       success: true,
       engine: "built-in-nlp",
-      engineLabel: "UFK Intelligent NLP Engine (100% Free)",
+      engineLabel: "UFK Intelligent AI Engine (100% Free)",
       answer: localResult.answer,
       citedPage: localResult.citedPage,
     });
