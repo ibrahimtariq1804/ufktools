@@ -1,0 +1,34 @@
+services:
+  ufktools:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ufktools:production
+    container_name: ufktools_app
+    restart: always
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@ufktools.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-ChangeThisSecurePasswordInProduction123!}
+      - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET:-change_this_to_a_64_character_random_hex_key}
+    volumes:
+      # Persist SQLite database and featured uploads outside container
+      - ufktools_db:/app/.db
+      - ufktools_uploads:/app/public/uploads
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1536M
+        reservations:
+          memory: 256M
+
+volumes:
+  ufktools_db:
+    driver: local
+  ufktools_uploads:
+    driver: local
