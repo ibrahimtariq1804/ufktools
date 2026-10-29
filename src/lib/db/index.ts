@@ -28,6 +28,23 @@ export interface FeaturedPostRecord {
   updatedAt: string;
 }
 
+export interface AnalyticsEvent {
+  id: string;
+  eventType: "pageview" | "tool_action";
+  path: string;
+  toolSlug?: string;
+  action?: string;
+  countryCode?: string;
+  city?: string;
+  region?: string;
+  deviceType?: "desktop" | "mobile" | "tablet";
+  browser?: string;
+  os?: string;
+  referrer?: string;
+  visitorHash: string;
+  createdAt: string;
+}
+
 // PostgreSQL Pool instance if DATABASE_URL is set
 let pgPool: Pool | null = null;
 if (process.env.DATABASE_URL) {
@@ -41,6 +58,7 @@ if (process.env.DATABASE_URL) {
 interface LocalStore {
   admins: AdminUser[];
   posts: FeaturedPostRecord[];
+  analytics?: AnalyticsEvent[];
 }
 
 const DB_DIR = path.join(process.cwd(), ".db");
@@ -84,6 +102,7 @@ function ensureLocalStore(): LocalStore {
           updatedAt: "2026-10-28T00:00:00.000Z",
         },
       ],
+      analytics: [],
     };
 
     fs.writeFileSync(STORE_FILE, JSON.stringify(initialStore, null, 2), "utf-8");
@@ -92,9 +111,11 @@ function ensureLocalStore(): LocalStore {
 
   try {
     const raw = fs.readFileSync(STORE_FILE, "utf-8");
-    return JSON.parse(raw) as LocalStore;
+    const parsed = JSON.parse(raw) as LocalStore;
+    if (!parsed.analytics) parsed.analytics = [];
+    return parsed;
   } catch {
-    return { admins: [], posts: [] };
+    return { admins: [], posts: [], analytics: [] };
   }
 }
 
@@ -398,4 +419,197 @@ export const db = {
       lastPublished: featured ? featured.publishedAt : null,
     };
   },
+
+  // Analytics Operations
+  async recordAnalyticsEvent(event: Omit<AnalyticsEvent, "id" | "createdAt">): Promise<AnalyticsEvent> {
+    const id = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const record: AnalyticsEvent = {
+      id,
+      eventType: event.eventType,
+      path: event.path || "/",
+      toolSlug: event.toolSlug,
+      action: event.action,
+      countryCode: event.countryCode || "UNKNOWN",
+      city: event.city || "Unknown",
+      region: event.region || "Unknown",
+      deviceType: event.deviceType || "desktop",
+      browser: event.browser || "Unknown",
+      os: event.os || "Unknown",
+      referrer: event.referrer || "direct",
+      visitorHash: event.visitorHash || "anon",
+      createdAt,
+    };
+
+    if (pgPool) {
+      try {
+        await pgPool.query(
+          `INSERT INTO analytics_events (
+            id, event_type, path, tool_slug, action, country_code, city, region,
+            device_type, browser, os, referrer, visitor_hash, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+          [
+            record.id,
+            record.eventType,
+            record.path,
+            record.toolSlug || null,
+            record.action || null,
+            record.countryCode,
+            record.city,
+            record.region,
+            record.deviceType,
+            record.browser,
+            record.os,
+            record.referrer,
+            record.visitorHash,
+            record.createdAt,
+          ]
+        );
+        return record;
+      } catch (err) {
+        console.error("Failed to insert analytics event in PostgreSQL:", err);
+      }
+    }
+
+    const store = ensureLocalStore();
+    if (!store.analytics) store.analytics = [];
+    store.analytics.push(record);
+    if (store.analytics.length > 5000) {
+      store.analytics = store.analytics.slice(-5000);
+    }
+    saveLocalStore(store);
+    return record;
+  },
+
+  async getAnalyticsSummary(range: "today" | "7d" | "30d" | "all" = "7d") {
+    let cutoffDate: Date;
+    const now = new Date();
+
+    if (range === "today") {
+      cutoffDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    } else if (range === "7d") {
+      cutoffDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    } else if (range === "30d") {
+      cutoffDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    } else {
+      cutoffDate = new Date(0);
+    }
+
+    const cutoffIso = cutoffDate.toISOString();
+
+    if (pgPool) {
+      try {
+        const eventsRes = await pgPool.query(
+          "SELECT * FROM analytics_events WHERE created_at >= $1 ORDER BY created_at DESC",
+          [cutoffIso]
+        );
+        const events: AnalyticsEvent[] = eventsRes.rows.map((r) => ({
+          id: r.id,
+          eventType: r.event_type,
+          path: r.path,
+          toolSlug: r.tool_slug || undefined,
+          action: r.action || undefined,
+          countryCode: r.country_code || undefined,
+          city: r.city || undefined,
+          region: r.region || undefined,
+          deviceType: r.device_type,
+          browser: r.browser || undefined,
+          os: r.os || undefined,
+          referrer: r.referrer || undefined,
+          visitorHash: r.visitor_hash,
+          createdAt: typeof r.created_at === "string" ? r.created_at : r.created_at.toISOString(),
+        }));
+        return aggregateAnalyticsData(events);
+      } catch (err) {
+        console.error("Failed to query PostgreSQL analytics:", err);
+      }
+    }
+
+    const store = ensureLocalStore();
+    const all = store.analytics || [];
+    const filtered = all.filter((e) => new Date(e.createdAt) >= cutoffDate);
+    return aggregateAnalyticsData(filtered);
+  },
 };
+
+function aggregateAnalyticsData(events: AnalyticsEvent[]) {
+  const totalEvents = events.length;
+  const pageviews = events.filter((e) => e.eventType === "pageview");
+  const toolActions = events.filter((e) => e.eventType === "tool_action");
+
+  const uniqueVisitors = new Set(events.map((e) => e.visitorHash)).size;
+
+  // Country counts
+  const countryMap: Record<string, number> = {};
+  events.forEach((e) => {
+    const c = (e.countryCode || "UNKNOWN").toUpperCase();
+    countryMap[c] = (countryMap[c] || 0) + 1;
+  });
+  const topCountries = Object.entries(countryMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([countryCode, count]) => ({
+      countryCode,
+      count,
+      percentage: totalEvents > 0 ? Math.round((count / totalEvents) * 100) : 0,
+    }));
+
+  // Tool counts
+  const toolMap: Record<string, number> = {};
+  toolActions.forEach((e) => {
+    if (e.toolSlug) {
+      toolMap[e.toolSlug] = (toolMap[e.toolSlug] || 0) + 1;
+    }
+  });
+  const topTools = Object.entries(toolMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([toolSlug, count]) => ({
+      toolSlug,
+      count,
+      percentage: toolActions.length > 0 ? Math.round((count / toolActions.length) * 100) : 0,
+    }));
+
+  // Device breakdown
+  const deviceBreakdown = {
+    desktop: 0,
+    mobile: 0,
+    tablet: 0,
+  };
+  events.forEach((e) => {
+    const dev = e.deviceType || "desktop";
+    if (dev === "mobile") deviceBreakdown.mobile++;
+    else if (dev === "tablet") deviceBreakdown.tablet++;
+    else deviceBreakdown.desktop++;
+  });
+
+  // Top referrers
+  const refMap: Record<string, number> = {};
+  events.forEach((e) => {
+    const r = (e.referrer || "direct").toLowerCase();
+    refMap[r] = (refMap[r] || 0) + 1;
+  });
+  const topReferrers = Object.entries(refMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([referrer, count]) => ({ referrer, count }));
+
+  // Recent events (latest 25)
+  const recentEvents = [...events]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 25);
+
+  return {
+    totalEvents,
+    totalPageviews: pageviews.length,
+    totalToolActions: toolActions.length,
+    uniqueVisitors,
+    topCountry: topCountries[0]?.countryCode || "None",
+    topCountryCount: topCountries[0]?.count || 0,
+    topCountries,
+    topTools,
+    deviceBreakdown,
+    topReferrers,
+    recentEvents,
+  };
+}

@@ -52,3 +52,27 @@ CREATE TABLE IF NOT EXISTS admin_audit_logs (
     ip_address VARCHAR(45),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 5. Analytics Events Table (Pageviews & Tool Actions)
+CREATE TABLE IF NOT EXISTS analytics_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type VARCHAR(50) NOT NULL, -- 'pageview' or 'tool_action'
+    path VARCHAR(255) NOT NULL,      -- e.g. '/', '/tools/merge-pdf'
+    tool_slug VARCHAR(100),          -- e.g. 'merge-pdf', 'cv-builder'
+    action VARCHAR(100),             -- e.g. 'process_file', 'download_pdf'
+    country_code VARCHAR(10),        -- 'US', 'GB', 'PK'
+    city VARCHAR(100),               -- 'London'
+    region VARCHAR(100),             -- 'England'
+    device_type VARCHAR(20),         -- 'desktop', 'mobile', 'tablet'
+    browser VARCHAR(50),             -- 'Chrome', 'Safari', 'Firefox'
+    os VARCHAR(50),                  -- 'Windows', 'iOS', 'Android', 'macOS'
+    referrer VARCHAR(255),           -- 'google.com', 'direct'
+    visitor_hash VARCHAR(64) NOT NULL, -- Salted anonymous visitor identifier
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_created_at ON analytics_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_analytics_tool_slug ON analytics_events(tool_slug) WHERE tool_slug IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_analytics_country ON analytics_events(country_code);
+

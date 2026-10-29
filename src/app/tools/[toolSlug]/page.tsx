@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TOOLS, getToolBySlug } from "@/config/tools.config";
 import { ToolPageShell } from "@/components/tools/ToolPageShell";
+import { ToolViewTracker } from "@/components/tools/ToolViewTracker";
 
 // Phase 3 Specialized Tool Implementations
 import { MergePdfTool } from "@/features/pdf-tools/MergePdfTool";
@@ -157,6 +158,7 @@ export default async function ToolPage({ params }: ToolPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(toolJsonLd) }}
       />
+      <ToolViewTracker toolSlug={tool.slug} />
       {renderToolComponent()}
     </>
   );

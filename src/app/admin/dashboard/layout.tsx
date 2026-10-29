@@ -15,6 +15,7 @@ import {
   X,
   Radio,
   Key,
+  BarChart3,
 } from "lucide-react";
 
 export default function AdminDashboardLayout({
@@ -75,6 +76,12 @@ export default function AdminDashboardLayout({
       href: "/admin/dashboard",
       icon: LayoutDashboard,
       active: pathname === "/admin/dashboard",
+    },
+    {
+      name: "Traffic & Analytics",
+      href: "/admin/dashboard/analytics",
+      icon: BarChart3,
+      active: pathname === "/admin/dashboard/analytics",
     },
     {
       name: "Manage Featured Content",
