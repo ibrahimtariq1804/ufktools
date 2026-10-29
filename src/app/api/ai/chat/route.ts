@@ -1,68 +1,11 @@
 import { NextResponse } from "next/server";
+import { answerDocumentQuery, cleanDocumentText } from "@/lib/ai/nlp-engine";
 
 interface ChatRequest {
   query: string;
   chunks: Array<{ page: number; text: string }>;
   history?: Array<{ sender: "user" | "bot"; text: string }>;
   apiKey?: string;
-}
-
-function synthesizeLocalAnswer(
-  query: string,
-  chunks: Array<{ page: number; text: string }>
-) {
-  const qTokens = query
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .split(/\s+/)
-    .filter((w) => w.length >= 3);
-
-  // Score chunks
-  const scored = chunks.map((chunk) => {
-    let matches = 0;
-    const lower = chunk.text.toLowerCase();
-    for (const tok of qTokens) {
-      if (lower.includes(tok)) matches += 1;
-    }
-    return { chunk, matches };
-  });
-
-  scored.sort((a, b) => b.matches - a.matches);
-  const best = scored[0];
-
-  if (!best || best.matches === 0) {
-    return {
-      answer: `I analyzed all ${chunks.length} pages of your document, but could not find a direct section discussing "${query}". Try searching for one of the primary keywords extracted in the Summary tab.`,
-      citedPage: undefined,
-    };
-  }
-
-  // Extract the most relevant 2 sentences from the best chunk
-  const sentences = best.chunk.text.match(/[^.!?\n]+[.!?\n]+/g) || [best.chunk.text];
-  const relevantSentences = sentences
-    .map((s) => {
-      const sLower = s.toLowerCase();
-      let matchCount = 0;
-      for (const tok of qTokens) {
-        if (sLower.includes(tok)) matchCount += 1;
-      }
-      return { text: s.replace(/\s+/g, " ").trim(), matchCount };
-    })
-    .filter((s) => s.matchCount > 0 && s.text.length >= 25);
-
-  relevantSentences.sort((a, b) => b.matchCount - a.matchCount);
-
-  let answerText = "";
-  if (relevantSentences.length > 0) {
-    answerText = `According to Page ${best.chunk.page}: "${relevantSentences.slice(0, 2).map((s) => s.text).join(" ")}"`;
-  } else {
-    answerText = `From Page ${best.chunk.page}: ${best.chunk.text.slice(0, 260).trim()}...`;
-  }
-
-  return {
-    answer: answerText,
-    citedPage: best.chunk.page,
-  };
 }
 
 export async function POST(req: Request) {
@@ -77,13 +20,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const qTokens = query
+    const cleanQuery = query.trim();
+    const qTokens = cleanQuery
       .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, "")
+      .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
       .filter((w) => w.length >= 3);
 
-    // Score and get top relevant excerpts
+    // Score chunks by query keyword frequency
     const scoredChunks = chunks.map((ch) => {
       let score = 0;
       const lower = ch.text.toLowerCase();
@@ -99,8 +43,8 @@ export async function POST(req: Request) {
 
     const contextText = (
       topChunks.length > 0
-        ? topChunks.map((tc) => `[Page ${tc.chunk.page}]: ${tc.chunk.text}`)
-        : chunks.slice(0, 2).map((c) => `[Page ${c.page}]: ${c.text}`)
+        ? topChunks.map((tc) => `[Page ${tc.chunk.page}]: ${cleanDocumentText(tc.chunk.text)}`)
+        : chunks.slice(0, 2).map((c) => `[Page ${c.page}]: ${cleanDocumentText(c.text)}`)
     ).join("\n\n");
 
     const geminiKey = (clientApiKey && !clientApiKey.startsWith("sk-")) ? clientApiKey : process.env.GEMINI_API_KEY;
@@ -119,21 +63,23 @@ export async function POST(req: Request) {
                 {
                   parts: [
                     {
-                      text: `You are an intelligent document research assistant. Answer the user's question accurately using the provided document excerpts. Keep answers clear, natural, and helpful. Always cite the relevant page numbers from the excerpts.
+                      text: `You are an expert document assistant. Answer the user's question directly, accurately, and to the point using only the provided document excerpts.
+State the direct answer immediately in your first sentence. Include the specific page number where the answer is found. Do not invent facts not in the text.
 
 Document Excerpts:
-${contextText.slice(0, 16000)}
+${contextText.slice(0, 18000)}
 
-User Question: ${query}`,
+User Question: ${cleanQuery}`,
                     },
                   ],
                 },
               ],
               generationConfig: {
-                temperature: 0.2,
-                maxOutputTokens: 600,
+                temperature: 0.1,
+                maxOutputTokens: 500,
               },
             }),
+            signal: AbortSignal.timeout(9000),
           }
         );
 
@@ -151,7 +97,7 @@ User Question: ${query}`,
           }
         }
       } catch (err) {
-        console.warn("Gemini chat error, falling back:", err);
+        console.warn("Gemini chat error, falling back to local NLP:", err);
       }
     }
 
@@ -169,17 +115,18 @@ User Question: ${query}`,
             messages: [
               {
                 role: "system",
-                content: `You are an intelligent document research assistant. Answer questions based on the document excerpts provided. Keep answers concise and mention relevant page numbers.\n\nDocument Excerpts:\n${contextText.slice(0, 14000)}`,
+                content: `You are an expert document assistant. Answer the question directly and concisely based on the excerpts. Always state the relevant page number.\n\nDocument Excerpts:\n${contextText.slice(0, 16000)}`,
               },
               ...history.slice(-3).map((h) => ({
                 role: h.sender === "user" ? ("user" as const) : ("assistant" as const),
                 content: h.text,
               })),
-              { role: "user" as const, content: query },
+              { role: "user" as const, content: cleanQuery },
             ],
-            temperature: 0.3,
-            max_tokens: 500,
+            temperature: 0.2,
+            max_tokens: 400,
           }),
+          signal: AbortSignal.timeout(9000),
         });
 
         if (openaiRes.ok) {
@@ -196,12 +143,50 @@ User Question: ${query}`,
           }
         }
       } catch (err) {
-        console.warn("OpenAI chat error, falling back:", err);
+        console.warn("OpenAI chat error, falling back to local NLP:", err);
       }
     }
 
-    // 3. Built-in Local Semantic Answer Engine
-    const localResult = synthesizeLocalAnswer(query, chunks);
+    // 3. High-Speed Cloud LLM Proxy (Free tier with 4s timeout)
+    try {
+      const freeLlmRes = await fetch("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert document assistant. Answer the user's question directly, accurately, and to the point using only the provided document excerpts. State the specific answer immediately with numbers/names if applicable. State the page number where the answer is found. Do not make up facts.\n\nDocument Excerpts:\n${contextText.slice(0, 14000)}`,
+            },
+            {
+              role: "user",
+              content: cleanQuery,
+            },
+          ],
+          model: "openai",
+        }),
+        signal: AbortSignal.timeout(4500),
+      });
+
+      if (freeLlmRes.ok) {
+        const textAnswer = await freeLlmRes.text();
+        // Check if valid answer (not rate limit notice)
+        if (textAnswer && !textAnswer.toLowerCase().includes("free limit reached")) {
+          return NextResponse.json({
+            success: true,
+            engine: "cloud-llm",
+            engineLabel: "High-Precision Cloud AI (Free)",
+            answer: textAnswer.trim(),
+            citedPage: primaryChunk.page,
+          });
+        }
+      }
+    } catch {
+      // Gracefully fall through to smart NLP engine
+    }
+
+    // 4. Built-in Entity-Aware Semantic Answer Engine
+    const localResult = answerDocumentQuery(cleanQuery, chunks);
     return NextResponse.json({
       success: true,
       engine: "built-in-nlp",

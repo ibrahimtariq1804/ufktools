@@ -283,25 +283,25 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
     <div className="min-h-screen bg-slate-50">
       {/* Breadcrumb */}
       <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-3.5">
-          <nav className="flex items-center gap-2 text-xs text-slate-500">
-            <Link href="/" className="hover:text-blue-600 transition-colors">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-3">
+          <nav className="flex items-center gap-2 text-xs text-slate-500 overflow-x-auto whitespace-nowrap scrollbar-none py-0.5">
+            <Link href="/" className="hover:text-blue-600 transition-colors shrink-0">
               Home
             </Link>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-            <Link href="/tools" className="hover:text-blue-600 transition-colors">
+            <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <Link href="/tools" className="hover:text-blue-600 transition-colors shrink-0">
               Tools
             </Link>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+            <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
             {category && (
               <>
-                <Link href={`/tools#${category.slug}`} className="hover:text-blue-600 transition-colors">
+                <Link href={`/tools#${category.slug}`} className="hover:text-blue-600 transition-colors shrink-0">
                   {category.name}
                 </Link>
-                <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               </>
             )}
-            <span className="font-semibold text-slate-800">{tool.name}</span>
+            <span className="font-semibold text-slate-800 shrink-0">{tool.name}</span>
           </nav>
         </div>
       </div>
@@ -322,7 +322,7 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
         </div>
 
         {/* Work Area */}
-        <div className="rounded-2xl bg-white shadow-xl border border-slate-200/80 p-6 sm:p-8">
+        <div className="rounded-2xl bg-white shadow-xl border border-slate-200/80 p-4 sm:p-8">
           {!selectedFile ? (
             /* Dropzone */
             <div
@@ -334,7 +334,7 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
               }}
               onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
-              className="group relative cursor-pointer rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/50 hover:bg-blue-50/30 p-8 sm:p-12 text-center transition-all"
+              className="group relative cursor-pointer rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/50 hover:bg-blue-50/30 p-6 sm:p-12 text-center transition-all"
             >
               <input
                 ref={fileInputRef}
@@ -347,16 +347,16 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                   }
                 }}
               />
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-md border border-slate-200 group-hover:scale-110 transition-transform">
-                <Bot className="h-7 w-7 text-blue-600" />
+              <div className="mx-auto flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-white shadow-md border border-slate-200 group-hover:scale-110 transition-transform">
+                <Bot className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600" />
               </div>
-              <h3 className="mt-4 text-base sm:text-lg font-bold text-slate-900">
+              <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-bold text-slate-900">
                 Drop PDF to Analyze & Summarize
               </h3>
               <p className="mt-1 text-xs sm:text-sm text-slate-500">
                 Drag and drop your document here, or click to browse
               </p>
-              <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600">
+              <div className="mt-3 sm:mt-4 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600">
                 <FileText className="h-3 w-3" />
                 <span>PDF or TXT up to {tool.maxFileSizeMB}MB</span>
               </div>
@@ -433,34 +433,34 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
             /* Document Workspace (Summary + Interactive Chat) */
             <div className="space-y-6">
               {/* Document Metrics Bar */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                    <BookOpen className="h-3.5 w-3.5 text-blue-600" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 sm:p-3.5">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                    <BookOpen className="h-3.5 w-3.5 text-blue-600 shrink-0" />
                     <span>Pages</span>
                   </div>
-                  <div className="text-lg font-bold text-slate-900">{totalPages}</div>
+                  <div className="text-base sm:text-lg font-bold text-slate-900">{totalPages}</div>
                 </div>
 
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                    <FileText className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Total Words</span>
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 sm:p-3.5">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                    <FileText className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <span>Words</span>
                   </div>
-                  <div className="text-lg font-bold text-slate-900">{totalWordCount.toLocaleString()}</div>
+                  <div className="text-base sm:text-lg font-bold text-slate-900 truncate">{totalWordCount.toLocaleString()}</div>
                 </div>
 
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                    <Clock className="h-3.5 w-3.5 text-purple-600" />
-                    <span>Est. Read Time</span>
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 sm:p-3.5">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                    <Clock className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                    <span>Read Time</span>
                   </div>
-                  <div className="text-lg font-bold text-slate-900">{readingTimeMin} min</div>
+                  <div className="text-base sm:text-lg font-bold text-slate-900">{readingTimeMin} min</div>
                 </div>
 
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 flex flex-col justify-between">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                    <Key className="h-3.5 w-3.5 text-amber-600" />
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 sm:p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                    <Key className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                     <span>AI Engine</span>
                   </div>
                   <div className="text-xs font-bold text-slate-800 flex items-center justify-between gap-1">
@@ -477,37 +477,37 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                 </div>
               </div>
 
-              {/* View Switcher Tabs */}
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <div className="flex items-center gap-2">
+              {/* View Switcher Tabs - Mobile Responsive */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-200 pb-3">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center w-full sm:w-auto">
                   <button
                     onClick={() => setActiveTab("summary")}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                    className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 sm:px-4 py-2.5 text-xs font-bold transition-all ${
                       activeTab === "summary"
                         ? "bg-blue-600 text-white shadow-sm"
                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                     }`}
                   >
                     <ListFilter className="h-3.5 w-3.5" />
-                    <span>Executive Summary</span>
+                    <span className="truncate">Executive Summary</span>
                   </button>
 
                   <button
                     onClick={() => setActiveTab("chat")}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                    className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 sm:px-4 py-2.5 text-xs font-bold transition-all ${
                       activeTab === "chat"
                         ? "bg-blue-600 text-white shadow-sm"
                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                     }`}
                   >
                     <Bot className="h-3.5 w-3.5" />
-                    <span>Ask Questions ({messages.length > 0 ? messages.length - 1 : 0})</span>
+                    <span className="truncate">Ask AI ({messages.length > 0 ? messages.length - 1 : 0})</span>
                   </button>
                 </div>
 
                 <button
                   onClick={handleReset}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-rose-600"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-rose-600 self-end sm:self-auto py-1 transition-colors"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   <span>Reset Document</span>
@@ -640,23 +640,29 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                     <div ref={chatBottomRef} />
                   </div>
 
-                  {/* Quick-Prompt Suggestions */}
+                    {/* Quick-Prompt Suggestions */}
                   <div className="flex flex-wrap gap-1.5 text-xs">
                     <button
                       onClick={() => handleSendMessage("What are the main conclusions of this document?")}
-                      className="rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
+                      className="rounded-full bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/80 px-3 py-1.5 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
                     >
                       What are the conclusions?
                     </button>
                     <button
                       onClick={() => handleSendMessage("What are the key dates, numbers, and deadlines?")}
-                      className="rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
+                      className="rounded-full bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/80 px-3 py-1.5 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
                     >
                       Dates & Numbers?
                     </button>
                     <button
+                      onClick={() => handleSendMessage("What are the key technical skills or requirements?")}
+                      className="rounded-full bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/80 px-3 py-1.5 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
+                    >
+                      Skills & Tech?
+                    </button>
+                    <button
                       onClick={() => handleSendMessage("Are there any restrictions, risks, or caveats?")}
-                      className="rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
+                      className="rounded-full bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/80 px-3 py-1.5 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
                     >
                       Risks & Limitations?
                     </button>
@@ -670,21 +676,21 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                     }}
                     className="flex items-center gap-2"
                   >
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 min-w-0">
                       <input
                         type="text"
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         placeholder="Ask a question about this document..."
-                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-10 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 sm:px-4 py-2.5 sm:py-3 pr-9 sm:pr-10 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
-                      <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     </div>
 
                     <button
                       type="submit"
                       disabled={!inputText.trim() || isBotThinking}
-                      className="inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 px-5 py-3 text-white transition-colors cursor-pointer"
+                      className="inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 px-4 sm:px-5 py-2.5 sm:py-3 text-white transition-colors cursor-pointer shrink-0"
                     >
                       <Send className="h-4 w-4" />
                     </button>

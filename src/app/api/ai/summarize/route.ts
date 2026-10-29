@@ -1,98 +1,11 @@
 import { NextResponse } from "next/server";
+import { generateSmartSummary } from "@/lib/ai/nlp-engine";
 
 interface SummarizeRequest {
   text: string;
   totalPages?: number;
   wordCount?: number;
   apiKey?: string;
-}
-
-const STOP_WORDS = new Set([
-  "the", "and", "to", "of", "in", "for", "with", "is", "a", "an", "on", "that", "this",
-  "by", "at", "as", "from", "are", "be", "or", "it", "was", "were", "which", "have", "has",
-  "had", "not", "but", "we", "they", "you", "their", "our", "all", "can", "will", "would",
-  "been", "more", "also", "into", "than", "other", "its", "any", "no", "may", "such",
-  "these", "them", "then", "there", "about", "could", "should", "their", "being", "what",
-  "when", "where", "who", "how", "each", "both", "under", "between", "over"
-]);
-
-function extractIntelligentSummary(text: string, totalPages: number) {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  const freqMap = new Map<string, number>();
-
-  for (const w of words) {
-    const cleaned = w.toLowerCase().replace(/[^a-z0-9]/g, "");
-    if (cleaned.length >= 4 && !STOP_WORDS.has(cleaned)) {
-      freqMap.set(cleaned, (freqMap.get(cleaned) || 0) + 1);
-    }
-  }
-
-  const sortedKeywords = Array.from(freqMap.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([word, count]) => ({ word, count }));
-
-  // Sentence tokenization
-  const rawSentences = text.match(/[^.!?\n]+[.!?\n]+/g) || [text];
-  const candidates: Array<{ text: string; score: number; pos: number }> = [];
-
-  rawSentences.forEach((raw, idx) => {
-    const cleaned = raw.replace(/\s+/g, " ").trim();
-    if (cleaned.length < 35 || cleaned.length > 320) return;
-    if (/^[0-9\s.,-]+$/.test(cleaned)) return; // skip bare numeric rows
-
-    const sWords = cleaned.toLowerCase().split(/\s+/);
-    let score = 0;
-    for (const sw of sWords) {
-      const wClean = sw.replace(/[^a-z0-9]/g, "");
-      if (freqMap.has(wClean)) {
-        score += freqMap.get(wClean)!;
-      }
-    }
-
-    // Length normalization & position bonus
-    const normScore = score / Math.sqrt(sWords.length || 1);
-    const posBonus = idx < 8 ? 1.4 : idx > rawSentences.length - 8 ? 1.2 : 1.0;
-
-    candidates.push({
-      text: cleaned,
-      score: normScore * posBonus,
-      pos: idx,
-    });
-  });
-
-  candidates.sort((a, b) => b.score - a.score);
-
-  // Pick top distinctive sentences
-  const selected: string[] = [];
-  for (const cand of candidates) {
-    if (selected.length >= 6) break;
-    // ensure not redundant with an existing selected sentence
-    const isRedundant = selected.some((s) => {
-      const sWords = new Set(s.toLowerCase().split(/\s+/));
-      const candWords = cand.text.toLowerCase().split(/\s+/);
-      const overlap = candWords.filter((w) => sWords.has(w)).length;
-      return overlap / Math.max(candWords.length, 1) > 0.65;
-    });
-
-    if (!isRedundant) {
-      selected.push(cand.text);
-    }
-  }
-
-  const overview = selected.slice(0, 2).join(" ");
-  const keyFindings = selected.slice(2, 6);
-  const conclusions = selected[selected.length - 1] || "The document presents structured domain insights summarized across its pages.";
-
-  return {
-    overview: overview || "This document contains structured analytical findings and operational details.",
-    keyFindings: keyFindings.length > 0 ? keyFindings : [
-      "Key topics analyzed based on predominant terminology across all sections.",
-      `Document analyzed across ${totalPages} page(s) and ${words.length.toLocaleString()} words.`
-    ],
-    conclusions,
-    keywords: sortedKeywords,
-  };
 }
 
 export async function POST(req: Request) {
@@ -120,18 +33,19 @@ export async function POST(req: Request) {
                 {
                   parts: [
                     {
-                      text: `You are an expert executive document analyst. Analyze the following document text (${totalPages} pages, ~${wordCount} words) and return a concise, high-value executive summary strictly in JSON format.
-                      
+                      text: `You are an expert executive document analyst. Analyze this document (${totalPages} pages, ~${wordCount} words).
+Provide a sharp, to-the-point, and highly structured summary strictly in JSON format. Do not include vague filler phrases or markdown code fences.
+
 JSON Structure:
 {
-  "overview": "A polished 2-3 sentence executive abstract explaining what this document is about",
+  "overview": "A clear, authoritative 2-sentence overview stating the specific subject/candidate/purpose and core competencies or scope",
   "keyFindings": [
-    "First core finding or highlight",
-    "Second core finding or highlight",
-    "Third core finding or highlight",
-    "Fourth core finding or highlight"
+    "First crucial finding, metric, or requirement with exact numbers if present",
+    "Second crucial finding, metric, or requirement",
+    "Third crucial finding, metric, or requirement",
+    "Fourth crucial finding, metric, or requirement"
   ],
-  "conclusions": "Key actionable takeaway or overall conclusion",
+  "conclusions": "Crisp actionable takeaway or final qualification verdict",
   "keywords": [{"word": "topic1", "count": 10}, {"word": "topic2", "count": 8}]
 }
 
@@ -142,10 +56,11 @@ ${text.slice(0, 32000)}`,
                 },
               ],
               generationConfig: {
-                temperature: 0.2,
+                temperature: 0.15,
                 responseMimeType: "application/json",
               },
             }),
+            signal: AbortSignal.timeout(9000),
           }
         );
 
@@ -183,7 +98,7 @@ ${text.slice(0, 32000)}`,
               {
                 role: "system",
                 content:
-                  'You are an expert document analyst. Return a JSON object with: {"overview": string, "keyFindings": string[], "conclusions": string, "keywords": [{"word": string, "count": number}]}',
+                  'You are an expert document analyst. Return a JSON object with: {"overview": string, "keyFindings": string[], "conclusions": string, "keywords": [{"word": string, "count": number}]}. Be to-the-point and factual.',
               },
               {
                 role: "user",
@@ -192,6 +107,7 @@ ${text.slice(0, 32000)}`,
             ],
             temperature: 0.2,
           }),
+          signal: AbortSignal.timeout(9000),
         });
 
         if (openaiRes.ok) {
@@ -212,8 +128,49 @@ ${text.slice(0, 32000)}`,
       }
     }
 
-    // 3. Built-in High-Accuracy Intelligent NLP Summarizer
-    const nlpSummary = extractIntelligentSummary(text, totalPages);
+    // 3. High-Speed Cloud LLM Proxy (Free tier with 4s timeout)
+    try {
+      const freeLlmRes = await fetch("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert document analyst. Return ONLY a valid JSON object without backticks or markdown:
+{"overview": "2-sentence executive summary with specific names, titles, and scope", "keyFindings": ["Finding 1 with exact numbers", "Finding 2", "Finding 3", "Finding 4"], "conclusions": "Crisp verdict or takeaway", "keywords": [{"word": "key1", "count": 5}]}`,
+            },
+            {
+              role: "user",
+              content: `Document Content:\n\n${text.slice(0, 16000)}`,
+            },
+          ],
+          model: "openai",
+          jsonMode: true,
+        }),
+        signal: AbortSignal.timeout(4500),
+      });
+
+      if (freeLlmRes.ok) {
+        const rawText = await freeLlmRes.text();
+        // Clean possible markdown code fences
+        const cleanJson = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+        const parsed = JSON.parse(cleanJson);
+        if (parsed.overview && Array.isArray(parsed.keyFindings) && parsed.keyFindings.length > 0) {
+          return NextResponse.json({
+            success: true,
+            engine: "cloud-llm",
+            engineLabel: "High-Precision Cloud AI (Free)",
+            summary: parsed,
+          });
+        }
+      }
+    } catch {
+      // Gracefully fall through to smart NLP engine
+    }
+
+    // 4. Built-in High-Accuracy Semantic NLP Summarizer (Entity & structure-aware)
+    const nlpSummary = generateSmartSummary(text, totalPages);
     return NextResponse.json({
       success: true,
       engine: "built-in-nlp",
