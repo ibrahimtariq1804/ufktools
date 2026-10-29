@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Wrench,
   ArrowRight,
+  FileText,
 } from "lucide-react";
 import { CATEGORIES } from "@/config/tools.config";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
@@ -123,6 +124,22 @@ export function Header() {
               >
                 About
               </Link>
+
+              {/* Free CV Button — on the right of ABOUT and left of search */}
+              <Link
+                href="/tools/cv-builder"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ml-1 shadow-xs group ${
+                  pathname === "/tools/cv-builder"
+                    ? "bg-blue-600 text-white shadow-blue-500/25"
+                    : "bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200/80 hover:border-blue-600 hover:shadow-sm"
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>Free CV</span>
+                <span className="text-[9px] uppercase px-1.5 py-0.5 bg-blue-600 text-white rounded font-extrabold group-hover:bg-white group-hover:text-blue-600 transition-colors">
+                  Free
+                </span>
+              </Link>
             </nav>
           </div>
 
@@ -152,8 +169,6 @@ export function Header() {
               <YoutubeIcon className="h-4 w-4 text-red-600" />
               <span>@UFK</span>
             </a>
-
-
 
             {/* Mobile Menu Toggle */}
             <button
@@ -201,6 +216,21 @@ export function Header() {
                 className="block px-3 py-2 text-base font-medium text-slate-800 rounded-lg hover:bg-slate-50"
               >
                 About UFK Tools
+              </Link>
+
+              {/* Free CV in mobile menu */}
+              <Link
+                href="/tools/cv-builder"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center justify-between px-3 py-2 text-base font-bold text-blue-700 bg-blue-50/80 rounded-lg border border-blue-100"
+              >
+                <span className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  Free CV Builder
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white px-2 py-0.5 rounded-md">
+                  Free
+                </span>
               </Link>
 
               <a

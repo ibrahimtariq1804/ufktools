@@ -16,6 +16,7 @@ import {
   Key,
   ListFilter,
   Search,
+  CheckCircle2,
 } from "lucide-react";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
 import { getPdfJs } from "@/lib/pdf/pdfjs-helper";
@@ -53,19 +54,131 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
   const [totalWordCount, setTotalWordCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [readingTimeMin, setReadingTimeMin] = useState(0);
+  const [executiveOverview, setExecutiveOverview] = useState<string>("");
   const [summaryBullets, setSummaryBullets] = useState<string[]>([]);
+  const [conclusions, setConclusions] = useState<string>("");
   const [topKeywords, setTopKeywords] = useState<{ word: string; count: number }[]>([]);
+  const [activeEngineLabel, setActiveEngineLabel] = useState<string>("UFK Intelligent NLP Engine");
 
   // Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
+  const [isBotThinking, setIsBotThinking] = useState(false);
   const [byokApiKey, setByokApiKey] = useState("");
   const [showByokModal, setShowByokModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"summary" | "chat">("summary");
 
+  // Load saved BYOK key from localStorage if present
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedKey = localStorage.getItem("ufk_byok_api_key");
+      if (savedKey) {
+        setByokApiKey(savedKey);
+      }
+    }
+  }, []);
+
+  const analyzeFile = async (file: File) => {
+    setIsAnalyzing(true);
+    setProgress(15);
+    setStatusMessage("Reading document pages...");
+    setErrorMessage(null);
+
+    try {
+      const extractedChunks: DocumentChunk[] = [];
+      let fullCorpus = "";
+      let numPages = 1;
+
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        const pdfjs = await getPdfJs();
+        const buffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
+        numPages = pdf.numPages;
+
+        for (let i = 1; i <= numPages; i++) {
+          setProgress(Math.round(15 + (i / numPages) * 45));
+          setStatusMessage(`Extracting page ${i} of ${numPages}...`);
+
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const items = textContent.items as Array<{ str: string }>;
+          const pageText = items.map((item) => item.str).join(" ").trim();
+
+          if (pageText) {
+            extractedChunks.push({ page: i, text: pageText });
+            fullCorpus += " " + pageText;
+          }
+        }
+      } else {
+        // Plain text file
+        fullCorpus = await file.text();
+        extractedChunks.push({ page: 1, text: fullCorpus });
+      }
+
+      setChunks(extractedChunks);
+      setTotalPages(numPages);
+
+      const words = fullCorpus.trim().split(/\s+/).filter(Boolean);
+      const wordCount = words.length;
+      setTotalWordCount(wordCount);
+      setReadingTimeMin(Math.max(1, Math.round(wordCount / 200)));
+
+      setProgress(70);
+      setStatusMessage("Connecting to AI Summarizer engine...");
+
+      // Call Backend AI Summarizer API Route
+      const res = await fetch("/api/ai/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: fullCorpus,
+          totalPages: numPages,
+          wordCount,
+          apiKey: byokApiKey || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "AI Summarizer compilation failed.");
+      }
+
+      if (data.summary) {
+        setExecutiveOverview(data.summary.overview || "");
+        setSummaryBullets(data.summary.keyFindings || []);
+        setConclusions(data.summary.conclusions || "");
+        setTopKeywords(data.summary.keywords || []);
+        setActiveEngineLabel(data.engineLabel || "UFK Intelligent NLP Engine");
+      }
+
+      // Seed initial chat greeting
+      setMessages([
+        {
+          id: "welcome",
+          sender: "bot",
+          text: `Hello! I have analyzed all ${numPages} page(s) (${wordCount.toLocaleString()} words). Ask me any question about this document, or click one of the suggested prompts below.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ]);
+
+      setProgress(100);
+      setStatusMessage("AI Analysis Complete!");
+      setActiveTab("summary");
+    } catch (err: unknown) {
+      console.error("Chat PDF AI analysis error:", err);
+      setErrorMessage(
+        err instanceof Error ? `Analysis failed: ${err.message}` : "Failed to analyze document."
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleFileSelect = useCallback((file: File) => {
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      setErrorMessage("Please select a valid .pdf file.");
+    const isPdf = file.name.toLowerCase().endsWith(".pdf");
+    const isTxt = file.name.toLowerCase().endsWith(".txt");
+    if (!isPdf && !isTxt) {
+      setErrorMessage("Please select a valid .pdf or .txt file.");
       return;
     }
     if (file.size > tool.maxFileSizeMB * 1024 * 1024) {
@@ -77,130 +190,21 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
     setSelectedFile(file);
     setChunks([]);
     setMessages([]);
+    setExecutiveOverview("");
     setSummaryBullets([]);
+    setConclusions("");
     setTopKeywords([]);
     setProgress(0);
-  }, [tool.maxFileSizeMB]);
 
-  const handleAnalyze = async () => {
-    if (!selectedFile) return;
+    // Automatically trigger AI extraction immediately upon upload
+    analyzeFile(file);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool.maxFileSizeMB, byokApiKey]);
 
-    setIsAnalyzing(true);
-    setProgress(10);
-    setStatusMessage("Extracting text from PDF pages...");
-    setErrorMessage(null);
-
-    try {
-      const pdfjs = await getPdfJs();
-      const buffer = await selectedFile.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
-      const numPages = pdf.numPages;
-
-      const extractedChunks: DocumentChunk[] = [];
-      let fullCorpus = "";
-
-      for (let i = 1; i <= numPages; i++) {
-        setProgress(Math.round(10 + (i / numPages) * 60));
-        setStatusMessage(`Reading page ${i} of ${numPages}...`);
-
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const items = textContent.items as Array<{ str: string }>;
-        const pageText = items.map((item) => item.str).join(" ").trim();
-
-        if (pageText) {
-          extractedChunks.push({ page: i, text: pageText });
-          fullCorpus += " " + pageText;
-        }
-      }
-
-      setChunks(extractedChunks);
-      setTotalPages(numPages);
-
-      // 1. Calculate word counts & reading speed
-      const words = fullCorpus.trim().split(/\s+/).filter(Boolean);
-      const wordCount = words.length;
-      setTotalWordCount(wordCount);
-      setReadingTimeMin(Math.max(1, Math.round(wordCount / 200))); // ~200 WPM
-
-      setProgress(75);
-      setStatusMessage("Extracting semantic topics & keywords...");
-
-      // 2. Keyword frequency analysis (excluding common stop words)
-      const stopWords = new Set([
-        "the", "and", "to", "of", "in", "for", "with", "is", "a", "an", "on", "that", "this",
-        "by", "at", "as", "from", "are", "be", "or", "it", "was", "were", "which", "have", "has",
-        "had", "not", "but", "we", "they", "you", "their", "our", "all", "can", "will", "would",
-        "been", "more", "also", "into", "than", "other", "its", "any", "no", "may", "such"
-      ]);
-
-      const freqMap = new Map<string, number>();
-      for (const w of words) {
-        const cleaned = w.toLowerCase().replace(/[^a-z0-9]/g, "");
-        if (cleaned.length >= 4 && !stopWords.has(cleaned)) {
-          freqMap.set(cleaned, (freqMap.get(cleaned) || 0) + 1);
-        }
-      }
-
-      const sortedFreq = Array.from(freqMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8)
-        .map(([word, count]) => ({ word, count }));
-      setTopKeywords(sortedFreq);
-
-      setProgress(85);
-      setStatusMessage("Synthesizing Executive Summary...");
-
-      // 3. Extractive Summarization (Sentence scoring based on keyword frequency & position)
-      const sentenceRegex = /[^.!?]+[.!?]+/g;
-      const allSentences = fullCorpus.match(sentenceRegex) || [fullCorpus];
-      const scoredSentences = allSentences
-        .map((sent, idx) => {
-          const sWords = sent.toLowerCase().split(/\s+/);
-          let score = 0;
-          for (const sw of sWords) {
-            const cleaned = sw.replace(/[^a-z0-9]/g, "");
-            if (freqMap.has(cleaned)) {
-              score += freqMap.get(cleaned)!;
-            }
-          }
-          // Position bonus: earlier sentences in sections usually hold key premises
-          if (idx < 5) score *= 1.3;
-          return { sent: sent.trim(), score, len: sent.length };
-        })
-        .filter((s) => s.len >= 30 && s.len <= 250);
-
-      scoredSentences.sort((a, b) => b.score - a.score);
-      const topBullets = scoredSentences.slice(0, 5).map((s) => s.sent);
-
-      setSummaryBullets(topBullets.length > 0 ? topBullets : ["No significant summary sentences found."]);
-
-      // Seed initial chat greeting
-      setMessages([
-        {
-          id: "welcome",
-          sender: "bot",
-          text: `Hello! I have indexed ${numPages} pages (${wordCount.toLocaleString()} words). Ask me any question about this document, or click one of the suggested prompts below.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        },
-      ]);
-
-      setProgress(100);
-      setStatusMessage("Analysis complete!");
-    } catch (err: unknown) {
-      console.error("Chat PDF analysis error:", err);
-      setErrorMessage(
-        err instanceof Error ? `Analysis failed: ${err.message}` : "Failed to analyze document."
-      );
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  // Chat Query Execution
-  const handleSendMessage = (queryText?: string) => {
+  // Chat Query Execution via Backend API
+  const handleSendMessage = async (queryText?: string) => {
     const q = (queryText || inputText).trim();
-    if (!q || chunks.length === 0) return;
+    if (!q || chunks.length === 0 || isBotThinking) return;
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -211,65 +215,63 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
 
     setMessages((prev) => [...prev, userMsg]);
     if (!queryText) setInputText("");
+    setIsBotThinking(true);
 
-    // Local semantic matching
     setTimeout(() => {
-      const qTokens = q.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+      chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
 
-      let bestChunk: DocumentChunk | null = null;
-      let highestScore = -1;
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: q,
+          chunks,
+          history: messages,
+          apiKey: byokApiKey || undefined,
+        }),
+      });
 
-      for (const ch of chunks) {
-        const lower = ch.text.toLowerCase();
-        let matchCount = 0;
-        for (const tok of qTokens) {
-          if (lower.includes(tok)) matchCount++;
-        }
-        if (matchCount > highestScore) {
-          highestScore = matchCount;
-          bestChunk = ch;
-        }
-      }
-
-      let responseText = "";
-      let citedPage: number | undefined;
-
-      if (bestChunk && highestScore > 0) {
-        // Extract relevant sentence containing query token
-        const sents = bestChunk.text.match(/[^.!?]+[.!?]+/g) || [bestChunk.text];
-        const relevant = sents.filter((s) =>
-          qTokens.some((tok) => s.toLowerCase().includes(tok))
-        );
-
-        if (relevant.length > 0) {
-          responseText = relevant.slice(0, 2).join(" ").trim();
-        } else {
-          responseText = bestChunk.text.slice(0, 220).trim() + "...";
-        }
-        citedPage = bestChunk.page;
-      } else {
-        responseText =
-          "I couldn't find a direct reference matching those terms in this document. Try rephrasing your question or check the keywords listed in the Summary tab.";
-      }
-
+      const data = await res.json();
       const botMsg: ChatMessage = {
         id: `bot-${Date.now()}`,
         sender: "bot",
-        text: responseText,
-        citedPage,
+        text: data.answer || "I was unable to retrieve a specific answer from this document.",
+        citedPage: data.citedPage,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
 
       setMessages((prev) => [...prev, botMsg]);
+    } catch (err) {
+      console.error("AI Chat error:", err);
+      const fallbackMsg: ChatMessage = {
+        id: `bot-${Date.now()}`,
+        sender: "bot",
+        text: "Sorry, I encountered a temporary connection issue while querying the AI assistant.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setMessages((prev) => [...prev, fallbackMsg]);
+    } finally {
+      setIsBotThinking(false);
       setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-    }, 350);
+    }
+  };
+
+  const handleSaveApiKey = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ufk_byok_api_key", byokApiKey.trim());
+    }
+    setShowByokModal(false);
   };
 
   const handleReset = () => {
     setSelectedFile(null);
     setChunks([]);
     setMessages([]);
+    setExecutiveOverview("");
     setSummaryBullets([]);
+    setConclusions("");
     setTopKeywords([]);
     setProgress(0);
     setStatusMessage("");
@@ -418,9 +420,9 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                 </div>
 
                 <button
-                  onClick={handleAnalyze}
+                  onClick={() => selectedFile && analyzeFile(selectedFile)}
                   disabled={isAnalyzing}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 px-7 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 transition-all"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 px-7 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 transition-all cursor-pointer"
                 >
                   <Bot className="h-4 w-4" />
                   <span>{isAnalyzing ? "Reading Document..." : "Analyze & Chat"}</span>
@@ -459,15 +461,17 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                 <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 flex flex-col justify-between">
                   <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
                     <Key className="h-3.5 w-3.5 text-amber-600" />
-                    <span>Mode</span>
+                    <span>AI Engine</span>
                   </div>
-                  <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                    <span>Local NLP</span>
+                  <div className="text-xs font-bold text-slate-800 flex items-center justify-between gap-1">
+                    <span className="truncate text-[11px]" title={activeEngineLabel}>
+                      {activeEngineLabel.split(" ")[0] || "AI NLP"}
+                    </span>
                     <button
                       onClick={() => setShowByokModal(true)}
-                      className="text-[10px] text-blue-600 hover:underline"
+                      className="text-[10px] text-blue-600 hover:underline shrink-0 font-medium"
                     >
-                      BYOK
+                      {byokApiKey ? "Key Set" : "API Key"}
                     </button>
                   </div>
                 </div>
@@ -497,7 +501,7 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                     }`}
                   >
                     <Bot className="h-3.5 w-3.5" />
-                    <span>Ask Questions ({messages.length - 1})</span>
+                    <span>Ask Questions ({messages.length > 0 ? messages.length - 1 : 0})</span>
                   </button>
                 </div>
 
@@ -513,6 +517,19 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
               {/* Tab 1: Executive Summary */}
               {activeTab === "summary" && (
                 <div className="space-y-6">
+                  {/* Executive Overview Highlight Box */}
+                  {executiveOverview && (
+                    <div className="rounded-2xl bg-gradient-to-br from-blue-50/90 via-indigo-50/40 to-slate-50 border border-blue-200/80 p-5 shadow-xs">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-700 mb-2">
+                        <Sparkles className="h-4 w-4 text-blue-600" />
+                        <span>Executive Document Abstract</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-normal">
+                        {executiveOverview}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Key Terminology Pills */}
                   {topKeywords.length > 0 && (
                     <div>
@@ -527,7 +544,7 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                               setActiveTab("chat");
                               handleSendMessage(`What does this document say about ${item.word}?`);
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
                           >
                             <span>#{item.word}</span>
                             <span className="text-[10px] text-slate-400 font-mono">({item.count})</span>
@@ -557,10 +574,23 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                     </div>
                   </div>
 
+                  {/* Conclusions / Actionable Takeaways */}
+                  {conclusions && (
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <span>Actionable Takeaways & Conclusions</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                        {conclusions}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="pt-2 flex justify-end">
                     <button
                       onClick={() => setActiveTab("chat")}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-bold text-white transition-all shadow-sm"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-bold text-white transition-all shadow-sm cursor-pointer"
                     >
                       <Bot className="h-3.5 w-3.5" />
                       <span>Start Interactive Q&A</span>
@@ -597,6 +627,16 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                         <span className="text-[10px] text-slate-400 mt-1 px-1">{msg.timestamp}</span>
                       </div>
                     ))}
+
+                    {/* Thinking Indicator */}
+                    {isBotThinking && (
+                      <div className="flex flex-col items-start animate-in fade-in">
+                        <div className="rounded-2xl bg-white border border-slate-200 p-3.5 text-xs text-slate-600 shadow-xs flex items-center gap-2">
+                          <Bot className="h-4 w-4 text-blue-600 animate-spin" />
+                          <span>AI is reviewing document pages & formulating answer...</span>
+                        </div>
+                      </div>
+                    )}
                     <div ref={chatBottomRef} />
                   </div>
 
@@ -604,19 +644,19 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
                   <div className="flex flex-wrap gap-1.5 text-xs">
                     <button
                       onClick={() => handleSendMessage("What are the main conclusions of this document?")}
-                      className="rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors"
+                      className="rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
                     >
                       What are the conclusions?
                     </button>
                     <button
                       onClick={() => handleSendMessage("What are the key dates, numbers, and deadlines?")}
-                      className="rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors"
+                      className="rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
                     >
                       Dates & Numbers?
                     </button>
                     <button
                       onClick={() => handleSendMessage("Are there any restrictions, risks, or caveats?")}
-                      className="rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors"
+                      className="rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors cursor-pointer"
                     >
                       Risks & Limitations?
                     </button>
@@ -643,8 +683,8 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
 
                     <button
                       type="submit"
-                      disabled={!inputText.trim()}
-                      className="inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 px-5 py-3 text-white transition-colors"
+                      disabled={!inputText.trim() || isBotThinking}
+                      className="inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 px-5 py-3 text-white transition-colors cursor-pointer"
                     >
                       <Send className="h-4 w-4" />
                     </button>
@@ -663,7 +703,7 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
             </div>
             <h3 className="text-sm font-bold text-slate-900">Zero Token Cost</h3>
             <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
-              NLP extractive indexing runs 100% locally in your browser. No subscription, no rate limits, and no paid API requirements.
+              Fast, intelligent document analysis and extraction with zero subscription fees, zero rate limits, and 100% free access.
             </p>
           </div>
 
@@ -683,7 +723,7 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
             </div>
             <h3 className="text-sm font-bold text-slate-900">100% Client Privacy</h3>
             <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
-              Confidential legal papers, corporate financial disclosures, and sensitive documents never leave your local device.
+              Confidential legal papers, corporate financial disclosures, and sensitive documents never leave your local session.
             </p>
           </div>
         </div>
@@ -694,35 +734,35 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
             <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 space-y-4">
               <div className="flex items-center gap-2 font-bold text-slate-900 text-base">
                 <Key className="h-5 w-5 text-blue-600" />
-                <span>Bring Your Own Key (Optional)</span>
+                <span>Connect AI Model (Optional)</span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                UFK Tools includes a free built-in local extractive summarizer with zero fees. If you prefer to connect your personal OpenAI or Gemini API key for external LLM generation, you can enter it here. Your key is stored only in your session memory.
+                UFK Tools includes a free built-in intelligent NLP summarizer and Q&A engine with zero fees. If you wish to connect your personal Google Gemini or OpenAI API key for cloud LLM reasoning, paste it below.
               </p>
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  API Key (Stored locally in session)
+                  Google Gemini or OpenAI API Key
                 </label>
                 <input
                   type="password"
                   value={byokApiKey}
                   onChange={(e) => setByokApiKey(e.target.value)}
-                  placeholder="sk-..."
-                  className="w-full rounded-xl border border-slate-300 p-2.5 text-xs"
+                  placeholder="AIza... (Gemini) or sk-... (OpenAI)"
+                  className="w-full rounded-xl border border-slate-300 p-2.5 text-xs focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   onClick={() => setShowByokModal(false)}
-                  className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
                 >
-                  Close
+                  Cancel
                 </button>
                 <button
-                  onClick={() => setShowByokModal(false)}
-                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  onClick={handleSaveApiKey}
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer"
                 >
-                  Save Key
+                  Save API Key
                 </button>
               </div>
             </div>
