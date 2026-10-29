@@ -83,18 +83,6 @@ function ensureLocalStore(): LocalStore {
           createdAt: "2026-10-28T00:00:00.000Z",
           updatedAt: "2026-10-28T00:00:00.000Z",
         },
-        {
-          id: "post-seed-002",
-          title: "Deep Sea Bioluminescence in the Mariana Trench",
-          fact: "More than 75% of deep-sea marine organisms produce their own light through bioluminescent chemical reactions involving luciferin, allowing them to communicate and hunt in complete ocean darkness.",
-          imageUrl:
-            "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=1200&auto=format&fit=crop",
-          imageFilename: "demo-ocean.jpg",
-          isFeatured: false,
-          publishedAt: "2026-10-27T00:00:00.000Z",
-          createdAt: "2026-10-27T00:00:00.000Z",
-          updatedAt: "2026-10-27T00:00:00.000Z",
-        },
       ],
     };
 

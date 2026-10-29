@@ -14,10 +14,10 @@ export interface FeaturedPost {
 }
 
 const DEFAULT_DEMO_POST: FeaturedPost = {
-  id: "demo-post-1",
-  title: "The F-35's Distributed Aperture System & Electro-Optical Targeting",
-  fact: "The F-35's AN/AAQ-37 DAS uses six high-resolution infrared sensors embedded around the airframe to project a seamless 360-degree spherical thermal feed directly into the pilot's helmet visor—allowing aviators to look directly through the aircraft floor and track ballistic missile launches from over 800 miles away.",
-  imageUrl: "https://images.unsplash.com/photo-1540979388789-6cee28a1cdc9?q=80&w=1200&auto=format&fit=crop",
+  id: "post-seed-001",
+  title: "The James Webb Space Telescope's Cosmic Marvel",
+  fact: "Did you know? Light from galaxies captured in deep-field images by modern space observatories has traveled through space for over 13.4 billion years—originating shortly after the dawn of our universe itself.",
+  imageUrl: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop",
   youtubeUrl: "https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8",
   publishedAt: "2026-10-28T00:00:00.000Z",
   isFeatured: true,

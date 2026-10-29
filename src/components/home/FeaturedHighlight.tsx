@@ -83,7 +83,7 @@ export function FeaturedHighlight({ initialPost }: FeaturedHighlightProps) {
               href="/picture-of-the-day"
               className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
             >
-              <span>Archive</span>
+              <span>Full Story</span>
               <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
