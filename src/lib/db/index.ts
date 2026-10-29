@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import os from "os";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
@@ -54,6 +55,37 @@ if (process.env.DATABASE_URL) {
   });
 }
 
+let ensuredAnalyticsTable = false;
+async function ensurePgAnalyticsTable() {
+  if (!pgPool || ensuredAnalyticsTable) return;
+  try {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS analytics_events (
+        id VARCHAR(64) PRIMARY KEY,
+        event_type VARCHAR(32) NOT NULL DEFAULT 'pageview',
+        path VARCHAR(255) NOT NULL,
+        tool_slug VARCHAR(100),
+        action VARCHAR(100),
+        country_code VARCHAR(10) NOT NULL DEFAULT 'UNKNOWN',
+        city VARCHAR(100) NOT NULL DEFAULT 'Unknown',
+        region VARCHAR(100) NOT NULL DEFAULT 'Unknown',
+        device_type VARCHAR(20) NOT NULL DEFAULT 'desktop',
+        browser VARCHAR(50) NOT NULL DEFAULT 'Unknown',
+        os VARCHAR(50) NOT NULL DEFAULT 'Unknown',
+        referrer VARCHAR(255) NOT NULL DEFAULT 'direct',
+        visitor_hash VARCHAR(64) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_analytics_created_at ON analytics_events(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);
+      CREATE INDEX IF NOT EXISTS idx_analytics_country ON analytics_events(country_code);
+    `);
+    ensuredAnalyticsTable = true;
+  } catch (err) {
+    console.error("Error ensuring analytics table in PostgreSQL:", err);
+  }
+}
+
 // Local File Store for Development when DATABASE_URL is not configured
 interface LocalStore {
   admins: AdminUser[];
@@ -61,69 +93,110 @@ interface LocalStore {
   analytics?: AnalyticsEvent[];
 }
 
-const DB_DIR = path.join(process.cwd(), ".db");
-const STORE_FILE = path.join(DB_DIR, "store.json");
+function getStoreFilePath(): string {
+  // If running in Vercel or AWS Lambda, process.cwd() is read-only.
+  // Use os.tmpdir() for writable file storage.
+  const isReadOnlyEnv = Boolean(
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.LAMBDA_TASK_ROOT
+  );
+
+  if (isReadOnlyEnv) {
+    const tmpDir = path.join(os.tmpdir(), "ufk-db");
+    try {
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      }
+    } catch {}
+    return path.join(tmpDir, "store.json");
+  }
+
+  const localDir = path.join(process.cwd(), ".db");
+  try {
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+    }
+  } catch {}
+  return path.join(localDir, "store.json");
+}
 
 function ensureLocalStore(): LocalStore {
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
+  const storeFile = getStoreFilePath();
+  const bundledFile = path.join(process.cwd(), ".db", "store.json");
+
+  if (fs.existsSync(storeFile)) {
+    try {
+      const raw = fs.readFileSync(storeFile, "utf-8");
+      const parsed = JSON.parse(raw) as LocalStore;
+      if (!parsed.analytics) parsed.analytics = [];
+      return parsed;
+    } catch {}
   }
 
-  if (!fs.existsSync(STORE_FILE)) {
-    // Seed initial administrator from environment variables or default
-    const initialEmail = process.env.ADMIN_EMAIL || "admin@ufktools.com";
-    const initialPassword = process.env.ADMIN_PASSWORD || "admin123";
-    const initialName = process.env.ADMIN_NAME || "UFK Administrator";
-
-    const defaultSalt = bcrypt.genSaltSync(10);
-    const defaultPasswordHash = bcrypt.hashSync(initialPassword, defaultSalt);
-
-    const initialStore: LocalStore = {
-      admins: [
-        {
-          id: "admin-default-uuid",
-          email: initialEmail,
-          passwordHash: defaultPasswordHash,
-          name: initialName,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      posts: [
-        {
-          id: "post-seed-001",
-          title: "The James Webb Space Telescope's Cosmic Marvel",
-          fact: "Did you know? Light from galaxies captured in deep-field images by modern space observatories has traveled through space for over 13.4 billion years—originating shortly after the dawn of our universe itself.",
-          imageUrl:
-            "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop",
-          imageFilename: "demo-space.jpg",
-          isFeatured: true,
-          publishedAt: "2026-10-28T00:00:00.000Z",
-          createdAt: "2026-10-28T00:00:00.000Z",
-          updatedAt: "2026-10-28T00:00:00.000Z",
-        },
-      ],
-      analytics: [],
-    };
-
-    fs.writeFileSync(STORE_FILE, JSON.stringify(initialStore, null, 2), "utf-8");
-    return initialStore;
+  if (storeFile !== bundledFile && fs.existsSync(bundledFile)) {
+    try {
+      const raw = fs.readFileSync(bundledFile, "utf-8");
+      const parsed = JSON.parse(raw) as LocalStore;
+      if (!parsed.analytics) parsed.analytics = [];
+      try {
+        fs.writeFileSync(storeFile, JSON.stringify(parsed, null, 2), "utf-8");
+      } catch {}
+      return parsed;
+    } catch {}
   }
+
+  // Seed initial administrator from environment variables or default
+  const initialEmail = process.env.ADMIN_EMAIL || "admin@ufktools.com";
+  const initialPassword = process.env.ADMIN_PASSWORD || "admin123";
+  const initialName = process.env.ADMIN_NAME || "UFK Administrator";
+
+  const defaultSalt = bcrypt.genSaltSync(10);
+  const defaultPasswordHash = bcrypt.hashSync(initialPassword, defaultSalt);
+
+  const initialStore: LocalStore = {
+    admins: [
+      {
+        id: "admin-default-uuid",
+        email: initialEmail,
+        passwordHash: defaultPasswordHash,
+        name: initialName,
+        createdAt: new Date().toISOString(),
+      },
+    ],
+    posts: [
+      {
+        id: "post-seed-001",
+        title: "The James Webb Space Telescope's Cosmic Marvel",
+        fact: "Did you know? Light from galaxies captured in deep-field images by modern space observatories has traveled through space for over 13.4 billion years—originating shortly after the dawn of our universe itself.",
+        imageUrl:
+          "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop",
+        imageFilename: "demo-space.jpg",
+        isFeatured: true,
+        publishedAt: "2026-10-28T00:00:00.000Z",
+        createdAt: "2026-10-28T00:00:00.000Z",
+        updatedAt: "2026-10-28T00:00:00.000Z",
+      },
+    ],
+    analytics: [],
+  };
 
   try {
-    const raw = fs.readFileSync(STORE_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as LocalStore;
-    if (!parsed.analytics) parsed.analytics = [];
-    return parsed;
-  } catch {
-    return { admins: [], posts: [], analytics: [] };
+    fs.writeFileSync(storeFile, JSON.stringify(initialStore, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Unable to write initial store to disk:", err);
   }
+
+  return initialStore;
 }
 
 function saveLocalStore(store: LocalStore) {
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
+  try {
+    const storeFile = getStoreFilePath();
+    fs.writeFileSync(storeFile, JSON.stringify(store, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Unable to save local store to disk:", err);
   }
-  fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), "utf-8");
 }
 
 export const db = {
@@ -443,6 +516,7 @@ export const db = {
 
     if (pgPool) {
       try {
+        await ensurePgAnalyticsTable();
         await pgPool.query(
           `INSERT INTO analytics_events (
             id, event_type, path, tool_slug, action, country_code, city, region,
@@ -499,6 +573,7 @@ export const db = {
 
     if (pgPool) {
       try {
+        await ensurePgAnalyticsTable();
         const eventsRes = await pgPool.query(
           "SELECT * FROM analytics_events WHERE created_at >= $1 ORDER BY created_at DESC",
           [cutoffIso]
