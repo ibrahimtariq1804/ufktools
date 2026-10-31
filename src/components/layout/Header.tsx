@@ -125,19 +125,18 @@ export function Header() {
                 About
               </Link>
 
-              {/* Free CV Button — on the right of ABOUT and left of search */}
+              {/* Build Your Professional CV Button — on the right of ABOUT and left of search */}
               <Link
                 href="/tools/cv-builder"
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ml-1 shadow-xs group ${
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ml-1.5 shadow-sm group ${
                   pathname === "/tools/cv-builder"
-                    ? "bg-blue-600 text-white shadow-blue-500/25"
-                    : "bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200/80 hover:border-blue-600 hover:shadow-sm"
+                    ? "bg-red-700 text-white ring-2 ring-red-400/50 shadow-md shadow-red-700/30"
+                    : "bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/20 hover:shadow-red-600/35 border border-red-500 hover:border-red-600 active:scale-[0.98]"
                 }`}
               >
-                <FileText className="h-3.5 w-3.5" />
-                <span>Free CV</span>
-                <span className="text-[9px] uppercase px-1.5 py-0.5 bg-blue-600 text-white rounded font-extrabold group-hover:bg-white group-hover:text-blue-600 transition-colors">
-                  Free
+                <FileText className="h-3.5 w-3.5 text-white/90" />
+                <span>
+                  Build your professional <strong className="font-black text-white tracking-wide">CV</strong>
                 </span>
               </Link>
             </nav>
@@ -218,18 +217,17 @@ export function Header() {
                 About UFK Tools
               </Link>
 
-              {/* Free CV in mobile menu */}
+              {/* Build Professional CV in mobile menu */}
               <Link
                 href="/tools/cv-builder"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center justify-between px-3 py-2 text-base font-bold text-blue-700 bg-blue-50/80 rounded-lg border border-blue-100"
+                className="flex items-center justify-between px-3.5 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm border border-red-500 transition-colors"
               >
                 <span className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-blue-600" />
-                  Free CV Builder
-                </span>
-                <span className="text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white px-2 py-0.5 rounded-md">
-                  Free
+                  <FileText className="h-4 w-4 text-white" />
+                  <span>
+                    Build your professional <strong className="font-black text-white">CV</strong>
+                  </span>
                 </span>
               </Link>
 

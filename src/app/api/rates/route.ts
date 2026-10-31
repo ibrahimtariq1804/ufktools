@@ -76,13 +76,54 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Free open-source European Central Bank rates from Frankfurter API
+    // 1. Primary Live Multi-Currency Provider (Open Exchange Rates: 160+ currencies including PKR, AED, SAR, INR, EUR, GBP)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+
+    const openRes = await fetch("https://open.er-api.com/v6/latest/USD", {
+      signal: controller.signal,
+      next: { revalidate: 43200 }, // 12 hours
+    });
+    clearTimeout(timeout);
+
+    if (openRes.ok) {
+      const data = await openRes.json();
+      if (data && data.rates) {
+        const mergedRates: Record<string, number> = {
+          ...FALLBACK_USD_RATES,
+          ...data.rates,
+          USD: 1.0,
+        };
+
+        memoryCache = {
+          rates: mergedRates,
+          base: "USD",
+          date: data.time_last_update_utc ? new Date(data.time_last_update_utc).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+          timestamp: now,
+        };
+
+        return NextResponse.json({
+          success: true,
+          base: "USD",
+          date: memoryCache.date,
+          rates: mergedRates,
+          cached: false,
+          source: "open-er-live",
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Primary live exchange rates fetch failed, trying secondary:", err);
+  }
+
+  try {
+    // 2. Secondary Provider (European Central Bank / Frankfurter API)
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
 
     const response = await fetch("https://api.frankfurter.app/latest?from=USD", {
       signal: controller.signal,
-      next: { revalidate: 43200 }, // 12 hours
+      next: { revalidate: 43200 },
     });
     clearTimeout(timeout);
 
@@ -111,7 +152,7 @@ export async function GET(request: Request) {
       });
     }
   } catch (err) {
-    console.warn("Could not fetch live rates from Frankfurter API, using fallback store:", err);
+    console.warn("Could not fetch live rates from secondary provider, using fallback store:", err);
   }
 
   // Graceful fallback to verified benchmark rates
