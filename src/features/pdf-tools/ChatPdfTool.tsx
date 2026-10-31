@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
 import { getPdfJs } from "@/lib/pdf/pdfjs-helper";
+import { trackToolAction } from "@/lib/analytics";
 
 interface ChatPdfToolProps {
   tool: ToolItem;
@@ -171,6 +172,7 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
         setConclusions(data.summary.conclusions || "");
         setTopKeywords(data.summary.keywords || []);
         setActiveEngineLabel(data.engineLabel || "UFK Intelligent NLP Engine");
+        trackToolAction("chat-pdf", "ai_summarize_completed");
       }
 
       // Seed initial chat greeting
@@ -265,6 +267,7 @@ export function ChatPdfTool({ tool }: ChatPdfToolProps) {
       };
 
       setMessages((prev) => [...prev, botMsg]);
+      trackToolAction("chat-pdf", "ai_chat_question");
     } catch (err) {
       console.error("AI Chat error:", err);
       const fallbackMsg: ChatMessage = {

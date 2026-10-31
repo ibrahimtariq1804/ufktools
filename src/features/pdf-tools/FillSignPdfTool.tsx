@@ -23,6 +23,7 @@ import {
 import { PDFDocument, rgb } from "pdf-lib";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
 import { getPdfJs } from "@/lib/pdf/pdfjs-helper";
+import { trackToolAction } from "@/lib/analytics";
 
 interface FillSignPdfToolProps {
   tool: ToolItem;
@@ -383,6 +384,7 @@ export function FillSignPdfTool({ tool }: FillSignPdfToolProps) {
 
       setProgress(100);
       setStatusMessage("Document signed successfully!");
+      trackToolAction("fill-and-sign-pdf", "signed_pdf_created");
     } catch (err: unknown) {
       console.error("Signing error:", err);
       setErrorMessage(
@@ -743,6 +745,7 @@ export function FillSignPdfTool({ tool }: FillSignPdfToolProps) {
                 <a
                   href={downloadUrl}
                   download={downloadFilename}
+                  onClick={() => trackToolAction("fill-and-sign-pdf", "download_signed_pdf")}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition-all"
                 >
                   <Download className="h-4 w-4" />

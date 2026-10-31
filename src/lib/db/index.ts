@@ -327,6 +327,45 @@ async function fetchAdminFromCloud(): Promise<AdminUser | null> {
   return null;
 }
 
+// Persistent Cloud Synchronization for Serverless Analytics
+const CLOUD_ANALYTICS_OBJECT_ID = "ff808181a09d98f701a191cd4fb272f9";
+
+async function syncAnalyticsToCloud(events: AnalyticsEvent[]): Promise<void> {
+  try {
+    await fetch(`https://api.restful-api.dev/objects/${CLOUD_ANALYTICS_OBJECT_ID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "ufk_analytics_store_v1",
+        data: {
+          lastUpdated: new Date().toISOString(),
+          events: events.slice(-300), // retain latest 300 active events across serverless restarts
+        },
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch (err) {
+    console.warn("Cloud analytics sync failed:", err);
+  }
+}
+
+async function fetchAnalyticsFromCloud(): Promise<AnalyticsEvent[]> {
+  try {
+    const res = await fetch(`https://api.restful-api.dev/objects/${CLOUD_ANALYTICS_OBJECT_ID}`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data && Array.isArray(json.data.events)) {
+        return json.data.events as AnalyticsEvent[];
+      }
+    }
+  } catch (err) {
+    console.warn("Cloud analytics fetch failed:", err);
+  }
+  return [];
+}
+
 export const db = {
   // Admin Operations
   async getAdminByEmail(email: string): Promise<AdminUser | null> {
@@ -746,6 +785,9 @@ export const db = {
       store.analytics = store.analytics.slice(-5000);
     }
     saveLocalStore(store);
+
+    // Asynchronously synchronize recent events to persistent cloud store (zero latency for visitor)
+    void syncAnalyticsToCloud(store.analytics);
     return record;
   },
 
@@ -794,7 +836,32 @@ export const db = {
       }
     }
 
+    // Serverless cloud persistence sync
+    const cloudEvents = await fetchAnalyticsFromCloud();
     const store = ensureLocalStore();
+    if (!store.analytics) store.analytics = [];
+
+    if (cloudEvents.length > 0) {
+      const existingIds = new Set(store.analytics.map((e) => e.id));
+      let added = false;
+      for (const ce of cloudEvents) {
+        if (!existingIds.has(ce.id)) {
+          store.analytics.push(ce);
+          existingIds.add(ce.id);
+          added = true;
+        }
+      }
+      if (added) {
+        store.analytics.sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+        if (store.analytics.length > 5000) {
+          store.analytics = store.analytics.slice(-5000);
+        }
+        saveLocalStore(store);
+      }
+    }
+
     const all = store.analytics || [];
     const filtered = all.filter((e) => new Date(e.createdAt) >= cutoffDate);
     return aggregateAnalyticsData(filtered);

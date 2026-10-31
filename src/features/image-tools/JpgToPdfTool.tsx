@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { PDFDocument, PageSizes } from "pdf-lib";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
+import { trackToolAction } from "@/lib/analytics";
 
 interface JpgToPdfToolProps {
   tool: ToolItem;
@@ -213,6 +214,7 @@ export function JpgToPdfTool({ tool }: JpgToPdfToolProps) {
       const url = URL.createObjectURL(blob);
       setPdfBlobUrl(url);
       setProgress(100);
+      trackToolAction("jpg-to-pdf", "convert_jpg_to_pdf");
     } catch (err: unknown) {
       console.error("JPG to PDF compile error:", err);
       const msg = err instanceof Error ? err.message : "Failed to convert images to PDF.";
@@ -496,6 +498,7 @@ export function JpgToPdfTool({ tool }: JpgToPdfToolProps) {
                 <a
                   href={pdfBlobUrl}
                   download="ufk-tools-images.pdf"
+                  onClick={() => trackToolAction("jpg-to-pdf", "download_pdf")}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/30 transition-all"
                 >
                   <Download className="h-4 w-4" />

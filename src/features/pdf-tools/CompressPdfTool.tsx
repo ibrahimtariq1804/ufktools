@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
+import { trackToolAction } from "@/lib/analytics";
 
 interface CompressPdfToolProps {
   tool: ToolItem;
@@ -161,6 +162,7 @@ export function CompressPdfTool({ tool }: CompressPdfToolProps) {
 
       setProgress(100);
       setStatusMessage("Optimization complete!");
+      trackToolAction("compress-pdf", "compress_completed");
     } catch (err: unknown) {
       console.error("Compression error:", err);
       setErrorMessage(
@@ -470,6 +472,7 @@ export function CompressPdfTool({ tool }: CompressPdfToolProps) {
                 <a
                   href={downloadUrl}
                   download={downloadFilename}
+                  onClick={() => trackToolAction("compress-pdf", "download_compressed_pdf")}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition-all"
                 >
                   <Download className="h-4 w-4" />

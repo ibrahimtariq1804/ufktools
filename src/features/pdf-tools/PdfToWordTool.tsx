@@ -19,6 +19,7 @@ import {
 import JSZip from "jszip";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
 import { getPdfJs } from "@/lib/pdf/pdfjs-helper";
+import { trackToolAction } from "@/lib/analytics";
 
 interface PdfToWordToolProps {
   tool: ToolItem;
@@ -350,6 +351,7 @@ ${docXmlBody}
 
       setProgress(100);
       setStatusMessage("Conversion complete!");
+      trackToolAction("pdf-to-word", "convert_pdf_to_docx");
     } catch (err: unknown) {
       console.error("PDF to Word conversion error:", err);
       setErrorMessage(
@@ -444,6 +446,7 @@ ${docXmlBody}
                 <a
                   href={downloadUrl}
                   download={downloadFilename}
+                  onClick={() => trackToolAction("pdf-to-word", "download_docx")}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-6 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 transition-all"
                 >
                   <Download className="h-4 w-4" />

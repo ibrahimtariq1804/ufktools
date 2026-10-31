@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
+import { trackToolAction } from "@/lib/analytics";
 
 interface CvBuilderToolProps {
   tool: ToolItem;
@@ -613,6 +614,7 @@ export function CvBuilderTool({ tool }: CvBuilderToolProps) {
       a.download = `${cleanName}_CV.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+      trackToolAction("cv-builder", "download_resume_pdf");
     } catch (err) {
       console.error("PDF export error:", err);
       alert("Failed to export PDF. Please try browser print instead.");
@@ -622,6 +624,7 @@ export function CvBuilderTool({ tool }: CvBuilderToolProps) {
   };
 
   const handlePrint = () => {
+    trackToolAction("cv-builder", "print_resume");
     window.print();
   };
 

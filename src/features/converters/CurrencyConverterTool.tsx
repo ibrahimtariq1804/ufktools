@@ -15,6 +15,7 @@ import {
   Globe2,
 } from "lucide-react";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
+import { trackToolAction } from "@/lib/analytics";
 
 interface CurrencyConverterToolProps {
   tool: ToolItem;
@@ -168,6 +169,7 @@ export function CurrencyConverterTool({ tool }: CurrencyConverterToolProps) {
     const temp = fromCode;
     setFromCode(toCode);
     setToCode(temp);
+    trackToolAction("currency-converter", "swap_currencies");
   };
 
   const handleCopy = () => {
@@ -175,6 +177,7 @@ export function CurrencyConverterTool({ tool }: CurrencyConverterToolProps) {
       const text = `${inputValue} ${fromCode} = ${convertedValue.toFixed(2)} ${toCode}`;
       navigator.clipboard.writeText(text);
       setCopied(true);
+      trackToolAction("currency-converter", "copy_conversion_rate");
       setTimeout(() => setCopied(false), 2000);
     }
   };

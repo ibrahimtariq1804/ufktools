@@ -23,6 +23,7 @@ import {
 import { ToolItem } from "@/config/tools.config";
 import { encryptPDF } from "@pdfsmaller/pdf-encrypt";
 import { decryptPDF, isEncrypted } from "@pdfsmaller/pdf-decrypt";
+import { trackToolAction } from "@/lib/analytics";
 
 interface UnlockProtectPdfToolProps {
   tool: ToolItem;
@@ -167,6 +168,7 @@ export function UnlockProtectPdfTool({ tool }: UnlockProtectPdfToolProps) {
         const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
 
         setSuccessResult({ downloadUrl, filename, sizeMB, mode: "protect" });
+        trackToolAction("unlock-protect-pdf", "protect_pdf_completed");
       } else {
         // Unlock Mode
         try {
@@ -177,6 +179,7 @@ export function UnlockProtectPdfTool({ tool }: UnlockProtectPdfToolProps) {
           const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
 
           setSuccessResult({ downloadUrl, filename, sizeMB, mode: "unlock" });
+          trackToolAction("unlock-protect-pdf", "unlock_pdf_completed");
         } catch (decryptErr: unknown) {
           const msg = decryptErr instanceof Error ? decryptErr.message : String(decryptErr);
           if (msg.toLowerCase().includes("password") || msg.toLowerCase().includes("incorrect") || msg.toLowerCase().includes("decrypt")) {
@@ -307,6 +310,7 @@ export function UnlockProtectPdfTool({ tool }: UnlockProtectPdfToolProps) {
                 <a
                   href={successResult.downloadUrl}
                   download={successResult.filename}
+                  onClick={() => trackToolAction("unlock-protect-pdf", successResult.mode === "protect" ? "download_protected_pdf" : "download_unlocked_pdf")}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-6 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 transition-all"
                 >
                   <Download className="h-4 w-4" />

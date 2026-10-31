@@ -22,6 +22,7 @@ import {
 import JSZip from "jszip";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
 import { getPdfJs } from "@/lib/pdf/pdfjs-helper";
+import { trackToolAction } from "@/lib/analytics";
 
 interface PdfToJpgToolProps {
   tool: ToolItem;
@@ -275,6 +276,7 @@ export function PdfToJpgTool({ tool }: PdfToJpgToolProps) {
 
       setProgress(100);
       setStatusMessage("Conversion complete!");
+      trackToolAction("pdf-to-jpg", "convert_pdf_to_images");
     } catch (err: unknown) {
       console.error("Conversion error:", err);
       setErrorMessage(
@@ -665,6 +667,7 @@ export function PdfToJpgTool({ tool }: PdfToJpgToolProps) {
                 <a
                   href={downloadUrl}
                   download={downloadFilename}
+                  onClick={() => trackToolAction("pdf-to-jpg", "download_converted_images")}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition-all"
                 >
                   {downloadStats && downloadStats.count > 1 ? (

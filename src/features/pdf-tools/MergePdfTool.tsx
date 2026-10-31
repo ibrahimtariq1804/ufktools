@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
+import { trackToolAction } from "@/lib/analytics";
 
 interface MergePdfToolProps {
   tool: ToolItem;
@@ -157,6 +158,7 @@ export function MergePdfTool({ tool }: MergePdfToolProps) {
         totalSizeBytes: mergedPdfBytes.byteLength,
       });
       setProgress(100);
+      trackToolAction("merge-pdf", "merge_completed");
     } catch (err: unknown) {
       console.error("PDF Merge error:", err);
       const msg = err instanceof Error ? err.message : "Failed to merge PDF documents.";
@@ -393,6 +395,7 @@ export function MergePdfTool({ tool }: MergePdfToolProps) {
                 <a
                   href={mergedBlobUrl}
                   download="ufk-tools-merged.pdf"
+                  onClick={() => trackToolAction("merge-pdf", "download_merged_pdf")}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/30 transition-all"
                 >
                   <Download className="h-4 w-4" />

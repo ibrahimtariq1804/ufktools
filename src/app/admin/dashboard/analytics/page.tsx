@@ -90,6 +90,41 @@ function formatToolName(slug: string): string {
     .join(" ");
 }
 
+const ACTION_LABELS: Record<string, string> = {
+  download_merged_pdf: "Downloaded Merged PDF",
+  merge_completed: "Merged PDF Files",
+  download_split_pdf: "Downloaded Split Pages",
+  split_completed: "Extracted PDF Pages",
+  download_compressed_pdf: "Downloaded Compressed PDF",
+  compress_completed: "Optimized File Size",
+  download_resume_pdf: "Downloaded Resume PDF",
+  print_resume: "Printed Resume",
+  convert_docx_to_pdf: "Converted DOCX to PDF",
+  convert_pdf_to_docx: "Converted PDF to Word",
+  download_docx: "Downloaded Word Document",
+  download_pdf: "Downloaded PDF Document",
+  ai_summarize_completed: "Generated AI Summary",
+  ai_chat_question: "Asked Question to AI",
+  signed_pdf_created: "Embedded Signatures",
+  download_signed_pdf: "Downloaded Signed PDF",
+  convert_jpg_to_pdf: "Converted Images to PDF",
+  convert_pdf_to_images: "Extracted High-Res Images",
+  modify_pages_completed: "Reordered/Rotated Pages",
+  download_modified_pdf: "Downloaded Reordered PDF",
+  protect_pdf_completed: "Encrypted Document (AES-256)",
+  download_protected_pdf: "Downloaded Protected PDF",
+  unlock_pdf_completed: "Decrypted PDF Password",
+  download_unlocked_pdf: "Downloaded Unlocked PDF",
+  swap_currencies: "Swapped Currency Rates",
+  copy_conversion_rate: "Copied Exchange Rate",
+  view_tool: "Opened Tool Workspace",
+};
+
+function formatActionName(action?: string): string {
+  if (!action) return "";
+  return ACTION_LABELS[action] || action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function timeAgo(dateString: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
   if (seconds < 60) return "Just now";
@@ -569,8 +604,8 @@ export default function AnalyticsDashboardPage() {
                           </span>
 
                           {event.action && (
-                            <span className="text-slate-400 font-mono text-[10px]">
-                              [{event.action}]
+                            <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md text-[10px] font-semibold">
+                              {formatActionName(event.action)}
                             </span>
                           )}
                         </div>

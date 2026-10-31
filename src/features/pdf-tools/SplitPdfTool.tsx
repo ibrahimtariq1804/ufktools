@@ -18,6 +18,7 @@ import {
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
+import { trackToolAction } from "@/lib/analytics";
 
 interface SplitPdfToolProps {
   tool: ToolItem;
@@ -137,6 +138,7 @@ export function SplitPdfTool({ tool }: SplitPdfToolProps) {
         setDownloadFilename(`${selectedFile.name.replace(".pdf", "")}-all-pages.zip`);
         setProgress(100);
       }
+      trackToolAction("split-pdf", "split_completed");
     } catch (err: unknown) {
       console.error("Split error:", err);
       const msg = err instanceof Error ? err.message : "Failed to split PDF.";
@@ -385,6 +387,7 @@ export function SplitPdfTool({ tool }: SplitPdfToolProps) {
                 <a
                   href={downloadUrl}
                   download={downloadFilename}
+                  onClick={() => trackToolAction("split-pdf", "download_split_pdf")}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/30 transition-all"
                 >
                   <Download className="h-4 w-4" />

@@ -17,6 +17,7 @@ import {
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import JSZip from "jszip";
 import { ToolItem, CATEGORIES } from "@/config/tools.config";
+import { trackToolAction } from "@/lib/analytics";
 
 interface WordToPdfToolProps {
   tool: ToolItem;
@@ -238,6 +239,7 @@ export function WordToPdfTool({ tool }: WordToPdfToolProps) {
 
       setProgress(100);
       setStatusMessage("Conversion complete!");
+      trackToolAction("word-to-pdf", "convert_docx_to_pdf");
     } catch (err: unknown) {
       console.error("DOCX conversion error:", err);
       setErrorMessage(
@@ -445,6 +447,7 @@ export function WordToPdfTool({ tool }: WordToPdfToolProps) {
                 <a
                   href={downloadUrl}
                   download={downloadFilename}
+                  onClick={() => trackToolAction("word-to-pdf", "download_pdf")}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition-all"
                 >
                   <Download className="h-4 w-4" />
