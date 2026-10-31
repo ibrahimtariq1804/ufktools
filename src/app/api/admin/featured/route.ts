@@ -10,7 +10,10 @@ export async function GET() {
   }
 
   const posts = await db.getAllPosts();
-  return NextResponse.json({ posts });
+  return NextResponse.json(
+    { posts },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+  );
 }
 
 export async function POST(request: Request) {

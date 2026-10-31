@@ -29,10 +29,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       // Live broadcast to all active visitors
       broadcastFeaturedUpdate(updated);
 
-      return NextResponse.json({
-        success: true,
-        post: updated,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          post: updated,
+        },
+        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+      );
     }
 
     return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
@@ -59,7 +62,16 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Post not found." }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, message: "Post deleted successfully." });
+    // Broadcast current featured post update to all active live homepage visitors
+    const currentFeatured = await db.getFeaturedPost();
+    if (currentFeatured) {
+      broadcastFeaturedUpdate(currentFeatured);
+    }
+
+    return NextResponse.json(
+      { success: true, message: "Post deleted successfully." },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
   } catch (error) {
     console.error("Delete post error:", error);
     return NextResponse.json(

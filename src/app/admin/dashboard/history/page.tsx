@@ -20,7 +20,7 @@ export default function HistoryPage() {
 
   const loadPosts = () => {
     setIsLoading(true);
-    fetch("/api/admin/featured")
+    fetch(`/api/admin/featured?t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => setPosts(data.posts || []))
       .catch((err) => console.error("Failed to load history:", err))
@@ -30,7 +30,7 @@ export default function HistoryPage() {
   useEffect(() => {
     let ignore = false;
 
-    fetch("/api/admin/featured")
+    fetch(`/api/admin/featured?t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (!ignore) {
@@ -52,6 +52,7 @@ export default function HistoryPage() {
 
   const handleSetFeatured = async (id: string, title: string) => {
     try {
+      setIsLoading(true);
       const res = await fetch(`/api/admin/featured/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -62,11 +63,23 @@ export default function HistoryPage() {
         setActionMessage(
           `"${title}" is now the active featured story! Broadcasted live to all open homepages.`
         );
+        setPosts((prev) =>
+          prev.map((p) => ({
+            ...p,
+            isFeatured: p.id === id,
+          }))
+        );
         loadPosts();
         setTimeout(() => setActionMessage(null), 3500);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Failed to set story as featured.");
       }
     } catch (err) {
       console.error("Failed to set featured:", err);
+      alert("Network error while updating featured status.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -74,17 +87,26 @@ export default function HistoryPage() {
     if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
 
     try {
+      setIsLoading(true);
       const res = await fetch(`/api/admin/featured/${id}`, {
         method: "DELETE",
       });
 
       if (res.ok) {
         setActionMessage(`"${title}" deleted successfully.`);
+        // Optimistically remove from state immediately
+        setPosts((prev) => prev.filter((p) => p.id !== id));
         loadPosts();
         setTimeout(() => setActionMessage(null), 3000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Failed to delete post.");
       }
     } catch (err) {
       console.error("Failed to delete post:", err);
+      alert("Network error while trying to delete post.");
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -689,9 +689,20 @@ export const db = {
       }
     }
 
+    // Pull latest cloud posts to ensure complete inventory
+    const cloudPosts = await fetchFeaturedPostsFromCloud();
     const store = ensureLocalStore();
+
+    const postMap = new Map<string, FeaturedPostRecord>();
+    for (const p of cloudPosts) {
+      postMap.set(p.id, p);
+    }
+    for (const p of store.posts) {
+      postMap.set(p.id, p);
+    }
+
     if (data.isFeatured) {
-      store.posts.forEach((p) => {
+      postMap.forEach((p) => {
         p.isFeatured = false;
       });
     }
@@ -711,7 +722,13 @@ export const db = {
       updatedAt: now,
     };
 
-    store.posts.unshift(newRecord);
+    postMap.set(id, newRecord);
+
+    const mergedPosts = Array.from(postMap.values()).sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
+
+    store.posts = mergedPosts;
     saveLocalStore(store);
     await syncFeaturedPostsToCloud(store.posts);
     return newRecord;
@@ -744,9 +761,20 @@ export const db = {
       }
     }
 
+    // Pull latest cloud posts to ensure complete inventory
+    const cloudPosts = await fetchFeaturedPostsFromCloud();
     const store = ensureLocalStore();
+
+    const postMap = new Map<string, FeaturedPostRecord>();
+    for (const p of cloudPosts) {
+      postMap.set(p.id, p);
+    }
+    for (const p of store.posts) {
+      postMap.set(p.id, p);
+    }
+
     let targetPost: FeaturedPostRecord | null = null;
-    store.posts.forEach((p) => {
+    postMap.forEach((p) => {
       if (p.id === id) {
         p.isFeatured = true;
         p.publishedAt = now;
@@ -758,6 +786,9 @@ export const db = {
     });
 
     if (targetPost) {
+      store.posts = Array.from(postMap.values()).sort(
+        (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+      );
       saveLocalStore(store);
       await syncFeaturedPostsToCloud(store.posts);
     }
@@ -770,15 +801,57 @@ export const db = {
       return (res.rowCount ?? 0) > 0;
     }
 
+    // Pull latest cloud posts to ensure complete inventory
+    const cloudPosts = await fetchFeaturedPostsFromCloud();
     const store = ensureLocalStore();
-    const initialLen = store.posts.length;
-    store.posts = store.posts.filter((p) => p.id !== id);
-    if (store.posts.length < initialLen) {
-      saveLocalStore(store);
-      await syncFeaturedPostsToCloud(store.posts);
-      return true;
+
+    const postMap = new Map<string, FeaturedPostRecord>();
+    for (const p of cloudPosts) {
+      postMap.set(p.id, p);
     }
-    return false;
+    for (const p of store.posts) {
+      postMap.set(p.id, p);
+    }
+
+    if (!postMap.has(id)) {
+      return false;
+    }
+
+    const wasFeatured = postMap.get(id)?.isFeatured;
+    postMap.delete(id);
+
+    // If remaining list is empty, restore clean seed post
+    if (postMap.size === 0) {
+      const seedPost: FeaturedPostRecord = {
+        id: "post-seed-001",
+        title: "The James Webb Space Telescope's Cosmic Marvel",
+        fact: "Did you know? Light from galaxies captured in deep-field images by modern space observatories has traveled through space for over 13.4 billion years—originating shortly after the dawn of our universe itself.",
+        imageUrl: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop",
+        imageFilename: "demo-space.jpg",
+        youtubeUrl: "https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8",
+        isFeatured: true,
+        publishedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      postMap.set(seedPost.id, seedPost);
+    } else if (wasFeatured) {
+      // If deleted post was featured, promote newest remaining post to active featured
+      const sorted = Array.from(postMap.values()).sort(
+        (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+      );
+      sorted[0].isFeatured = true;
+      for (let i = 1; i < sorted.length; i++) {
+        sorted[i].isFeatured = false;
+      }
+    }
+
+    store.posts = Array.from(postMap.values()).sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
+    saveLocalStore(store);
+    await syncFeaturedPostsToCloud(store.posts);
+    return true;
   },
 
   async getStats() {

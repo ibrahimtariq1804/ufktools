@@ -21,7 +21,7 @@ export default function AdminDashboardPage() {
 
   const loadData = () => {
     setIsLoading(true);
-    fetch("/api/admin/featured")
+    fetch(`/api/admin/featured?t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         const posts: FeaturedPostRecord[] = data.posts || [];
@@ -36,7 +36,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     let ignore = false;
 
-    fetch("/api/admin/featured")
+    fetch(`/api/admin/featured?t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (!ignore) {
