@@ -779,15 +779,18 @@ export const db = {
     }
 
     const store = ensureLocalStore();
-    if (!store.analytics) store.analytics = [];
+    if (!store.analytics || store.analytics.length === 0) {
+      const cloudEvents = await fetchAnalyticsFromCloud();
+      store.analytics = cloudEvents || [];
+    }
     store.analytics.push(record);
     if (store.analytics.length > 5000) {
       store.analytics = store.analytics.slice(-5000);
     }
     saveLocalStore(store);
 
-    // Asynchronously synchronize recent events to persistent cloud store (zero latency for visitor)
-    void syncAnalyticsToCloud(store.analytics);
+    // Synchronize recent events to persistent cloud store before serverless freeze
+    await syncAnalyticsToCloud(store.analytics);
     return record;
   },
 
