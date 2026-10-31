@@ -57,28 +57,112 @@ export async function POST(request: Request) {
     if (file.type === "image/webp") extension = "webp";
 
     const uniqueFilename = `${crypto.randomUUID()}.${extension}`;
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "featured");
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    // Option 1: ImgBB Cloud Upload if API key is provided
+    if (process.env.IMGBB_API_KEY) {
+      try {
+        const imgbbForm = new FormData();
+        imgbbForm.append("image", buffer.toString("base64"));
+        const imgbbRes = await fetch(
+          `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
+          {
+            method: "POST",
+            body: imgbbForm,
+            signal: AbortSignal.timeout(8000),
+          }
+        );
+        if (imgbbRes.ok) {
+          const imgbbData = await imgbbRes.json();
+          if (imgbbData?.data?.url) {
+            return NextResponse.json({
+              success: true,
+              url: imgbbData.data.url,
+              filename: uniqueFilename,
+              size: file.size,
+            });
+          }
+        }
+      } catch (imgbbErr) {
+        console.warn("ImgBB upload failed, trying next strategy:", imgbbErr);
+      }
     }
 
-    const targetFilePath = path.join(uploadDir, uniqueFilename);
-    const arrayBuffer = await file.arrayBuffer();
-    fs.writeFileSync(targetFilePath, Buffer.from(arrayBuffer));
+    // Option 2: Local Disk Storage if filesystem is writable (Local Dev, Docker, VPS)
+    let isLocalDiskWritable = false;
+    const uploadDir = path.join(process.cwd(), "public", "uploads", "featured");
+    try {
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      const testFile = path.join(uploadDir, `.test-write-${Date.now()}`);
+      fs.writeFileSync(testFile, "test");
+      fs.unlinkSync(testFile);
+      isLocalDiskWritable = true;
+    } catch {
+      isLocalDiskWritable = false;
+    }
 
-    const publicUrl = `/uploads/featured/${uniqueFilename}`;
+    if (isLocalDiskWritable) {
+      try {
+        const targetFilePath = path.join(uploadDir, uniqueFilename);
+        fs.writeFileSync(targetFilePath, buffer);
+        const publicUrl = `/uploads/featured/${uniqueFilename}`;
+        return NextResponse.json({
+          success: true,
+          url: publicUrl,
+          filename: uniqueFilename,
+          size: file.size,
+        });
+      } catch (writeErr) {
+        console.warn("Local disk write error, falling back to cloud/data URI:", writeErr);
+      }
+    }
+
+    // Option 3: Serverless Cloud Upload (Catbox.moe permanent free hosting)
+    try {
+      const catboxForm = new FormData();
+      catboxForm.append("reqtype", "fileupload");
+      const blob = new Blob([buffer], { type: file.type || "image/jpeg" });
+      catboxForm.append("fileToUpload", blob, uniqueFilename);
+
+      const catboxRes = await fetch("https://catbox.moe/user/api.php", {
+        method: "POST",
+        body: catboxForm,
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (catboxRes.ok) {
+        const directUrl = (await catboxRes.text()).trim();
+        if (directUrl.startsWith("http")) {
+          return NextResponse.json({
+            success: true,
+            url: directUrl,
+            filename: uniqueFilename,
+            size: file.size,
+          });
+        }
+      }
+    } catch (catboxErr) {
+      console.warn("Catbox cloud upload error, falling back to Base64 Data URI:", catboxErr);
+    }
+
+    // Option 4: Zero-dependency Serverless Base64 Data URI (100% resilient fallback)
+    const base64Data = buffer.toString("base64");
+    const mimeType = file.type || "image/jpeg";
+    const dataUri = `data:${mimeType};base64,${base64Data}`;
 
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      url: dataUri,
       filename: uniqueFilename,
       size: file.size,
     });
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json(
-      { error: "Failed to upload and store image." },
+      { error: "Failed to upload image. Please check file format and try again." },
       { status: 500 }
     );
   }

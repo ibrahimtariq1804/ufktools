@@ -28,7 +28,7 @@ export function useFeaturedPost(initialPost?: FeaturedPost | null) {
 
   useEffect(() => {
     // 1. Fetch latest post from database API
-    fetch("/api/featured")
+    fetch(`/api/featured?t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data && data.post) {

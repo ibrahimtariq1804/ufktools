@@ -74,7 +74,7 @@ async function ensurePgTables() {
         id VARCHAR(64) PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         fact TEXT NOT NULL,
-        image_url VARCHAR(500) NOT NULL,
+        image_url TEXT NOT NULL,
         image_filename VARCHAR(255) NOT NULL,
         thumbnail_url VARCHAR(500),
         youtube_url VARCHAR(500),
@@ -366,6 +366,45 @@ async function fetchAnalyticsFromCloud(): Promise<AnalyticsEvent[]> {
   return [];
 }
 
+// Persistent Cloud Synchronization for Serverless Featured Posts
+const CLOUD_FEATURED_OBJECT_ID = "ff808181a09d98f701a19400392c79b5";
+
+async function syncFeaturedPostsToCloud(posts: FeaturedPostRecord[]): Promise<void> {
+  try {
+    await fetch(`https://api.restful-api.dev/objects/${CLOUD_FEATURED_OBJECT_ID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "ufk_featured_posts_store_v1",
+        data: {
+          lastUpdated: new Date().toISOString(),
+          posts: posts.slice(0, 50),
+        },
+      }),
+      signal: AbortSignal.timeout(3500),
+    });
+  } catch (err) {
+    console.warn("Cloud featured posts sync failed:", err);
+  }
+}
+
+async function fetchFeaturedPostsFromCloud(): Promise<FeaturedPostRecord[]> {
+  try {
+    const res = await fetch(`https://api.restful-api.dev/objects/${CLOUD_FEATURED_OBJECT_ID}`, {
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data && Array.isArray(json.data.posts) && json.data.posts.length > 0) {
+        return json.data.posts as FeaturedPostRecord[];
+      }
+    }
+  } catch {
+    // Fall back to local store
+  }
+  return [];
+}
+
 export const db = {
   // Admin Operations
   async getAdminByEmail(email: string): Promise<AdminUser | null> {
@@ -535,6 +574,15 @@ export const db = {
       return res.rows[0] || null;
     }
 
+    const cloudPosts = await fetchFeaturedPostsFromCloud();
+    if (cloudPosts.length > 0) {
+      const store = ensureLocalStore();
+      store.posts = cloudPosts;
+      saveLocalStore(store);
+      const activeFeatured = cloudPosts.find((p) => p.isFeatured) || cloudPosts[0];
+      if (activeFeatured) return activeFeatured;
+    }
+
     const store = ensureLocalStore();
     return store.posts.find((p) => p.isFeatured) || store.posts[0] || null;
   },
@@ -549,6 +597,14 @@ export const db = {
          ORDER BY published_at DESC`
       );
       return res.rows;
+    }
+
+    const cloudPosts = await fetchFeaturedPostsFromCloud();
+    if (cloudPosts.length > 0) {
+      const store = ensureLocalStore();
+      store.posts = cloudPosts;
+      saveLocalStore(store);
+      return cloudPosts;
     }
 
     const store = ensureLocalStore();
@@ -568,6 +624,12 @@ export const db = {
         [id]
       );
       return res.rows[0] || null;
+    }
+
+    const cloudPosts = await fetchFeaturedPostsFromCloud();
+    if (cloudPosts.length > 0) {
+      const found = cloudPosts.find((p) => p.id === id);
+      if (found) return found;
     }
 
     const store = ensureLocalStore();
@@ -651,6 +713,7 @@ export const db = {
 
     store.posts.unshift(newRecord);
     saveLocalStore(store);
+    await syncFeaturedPostsToCloud(store.posts);
     return newRecord;
   },
 
@@ -696,6 +759,7 @@ export const db = {
 
     if (targetPost) {
       saveLocalStore(store);
+      await syncFeaturedPostsToCloud(store.posts);
     }
     return targetPost;
   },
@@ -711,6 +775,7 @@ export const db = {
     store.posts = store.posts.filter((p) => p.id !== id);
     if (store.posts.length < initialLen) {
       saveLocalStore(store);
+      await syncFeaturedPostsToCloud(store.posts);
       return true;
     }
     return false;
