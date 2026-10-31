@@ -13,19 +13,22 @@ export async function GET(request: Request) {
       );
 
       // 2. Listener for featured post updates
-      const onFeaturedUpdate = (post: FeaturedPostRecord) => {
+      const onFeaturedUpdate = (post: FeaturedPostRecord | null) => {
         try {
           const payload = JSON.stringify({
             type: "NEW_FEATURED_POST",
-            post: {
-              id: post.id,
-              title: post.title,
-              fact: post.fact,
-              imageUrl: post.imageUrl,
-              thumbnailUrl: post.thumbnailUrl,
-              publishedAt: post.publishedAt,
-              isFeatured: post.isFeatured,
-            },
+            post: post
+              ? {
+                  id: post.id,
+                  title: post.title,
+                  fact: post.fact,
+                  imageUrl: post.imageUrl,
+                  thumbnailUrl: post.thumbnailUrl,
+                  youtubeUrl: post.youtubeUrl,
+                  publishedAt: post.publishedAt,
+                  isFeatured: post.isFeatured,
+                }
+              : null,
           });
           controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
         } catch {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getAdminSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { broadcastFeaturedUpdate } from "@/lib/sse/broadcaster";
@@ -28,6 +29,16 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
       // Live broadcast to all active visitors
       broadcastFeaturedUpdate(updated);
+
+      // Invalidate static / PPR cache across the site
+      try {
+        revalidatePath("/");
+        revalidatePath("/picture-of-the-day");
+        revalidatePath("/admin/dashboard");
+        revalidatePath("/admin/dashboard/history");
+      } catch (e) {
+        console.warn("Revalidation error:", e);
+      }
 
       return NextResponse.json(
         {
@@ -62,14 +73,22 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Post not found." }, { status: 404 });
     }
 
-    // Broadcast current featured post update to all active live homepage visitors
-    const currentFeatured = await db.getFeaturedPost();
-    if (currentFeatured) {
-      broadcastFeaturedUpdate(currentFeatured);
+    // Invalidate static / PPR cache across the site immediately
+    try {
+      revalidatePath("/");
+      revalidatePath("/picture-of-the-day");
+      revalidatePath("/admin/dashboard");
+      revalidatePath("/admin/dashboard/history");
+    } catch (e) {
+      console.warn("Revalidation error:", e);
     }
 
+    // Broadcast current featured post update (or null if all posts deleted) to all active live homepage visitors
+    const currentFeatured = await db.getFeaturedPost();
+    broadcastFeaturedUpdate(currentFeatured);
+
     return NextResponse.json(
-      { success: true, message: "Post deleted successfully." },
+      { success: true, message: "Post deleted successfully.", featuredPost: currentFeatured },
       { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
     );
   } catch (error) {

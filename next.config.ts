@@ -72,7 +72,7 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://www.youtube.com https://s.ytimg.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
-              "img-src 'self' data: blob: https://*.ytimg.com https://i.ytimg.com https://images.unsplash.com",
+              "img-src 'self' data: blob: https://*.ytimg.com https://i.ytimg.com https://images.unsplash.com https://files.catbox.moe https://*.catbox.moe https://i.ibb.co https://*.imgbb.com",
               "media-src 'self' data: blob:",
               "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
               "worker-src 'self' blob:",

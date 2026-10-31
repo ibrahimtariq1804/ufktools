@@ -23,6 +23,10 @@ export function FeaturedHighlight({ initialPost }: FeaturedHighlightProps) {
   const { post } = useFeaturedPost(initialPost);
   const [copied, setCopied] = useState(false);
 
+  if (!post) {
+    return null;
+  }
+
   const formattedDate = new Date(post.publishedAt).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",

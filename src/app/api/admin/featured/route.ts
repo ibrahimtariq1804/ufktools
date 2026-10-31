@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getAdminSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { broadcastFeaturedUpdate } from "@/lib/sse/broadcaster";
@@ -46,6 +47,16 @@ export async function POST(request: Request) {
     // If marked featured, broadcast immediately to all live visitors
     if (newPost.isFeatured) {
       broadcastFeaturedUpdate(newPost);
+    }
+
+    // Invalidate static / PPR cache across the site
+    try {
+      revalidatePath("/");
+      revalidatePath("/picture-of-the-day");
+      revalidatePath("/admin/dashboard");
+      revalidatePath("/admin/dashboard/history");
+    } catch (e) {
+      console.warn("Revalidation error:", e);
     }
 
     return NextResponse.json({

@@ -24,18 +24,27 @@ const DEFAULT_DEMO_POST: FeaturedPost = {
 };
 
 export function useFeaturedPost(initialPost?: FeaturedPost | null) {
-  const [post, setPost] = useState<FeaturedPost>(initialPost || DEFAULT_DEMO_POST);
+  const [post, setPost] = useState<FeaturedPost | null>(
+    initialPost !== undefined ? initialPost : null
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(initialPost === undefined);
 
   useEffect(() => {
+    let isMounted = true;
+
     // 1. Fetch latest post from database API
     fetch(`/api/featured?t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
-        if (data && data.post) {
-          setPost(data.post);
+        if (!isMounted) return;
+        if (data && "post" in data) {
+          setPost(data.post || null);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
 
     // 2. Connect to live real-time SSE stream
     let eventSource: EventSource | null = null;
@@ -43,10 +52,11 @@ export function useFeaturedPost(initialPost?: FeaturedPost | null) {
       eventSource = new EventSource("/api/sse/featured-stream");
 
       eventSource.onmessage = (event) => {
+        if (!isMounted) return;
         try {
           const data = JSON.parse(event.data);
-          if (data && data.type === "NEW_FEATURED_POST" && data.post) {
-            setPost(data.post);
+          if (data && data.type === "NEW_FEATURED_POST") {
+            setPost(data.post || null);
           }
         } catch {
           // Ignore parse errors on heartbeat
@@ -54,7 +64,6 @@ export function useFeaturedPost(initialPost?: FeaturedPost | null) {
       };
 
       eventSource.onerror = () => {
-        // SSE disconnected or endpoint not yet active (Phase 1)
         eventSource?.close();
       };
     } catch {
@@ -62,9 +71,10 @@ export function useFeaturedPost(initialPost?: FeaturedPost | null) {
     }
 
     return () => {
+      isMounted = false;
       eventSource?.close();
     };
   }, []);
 
-  return { post };
+  return { post, isLoading };
 }

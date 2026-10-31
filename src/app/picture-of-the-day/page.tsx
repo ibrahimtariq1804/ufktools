@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { YoutubeIcon } from "@/components/ui/BrandIcons";
+import { LivePageRefresher } from "@/features/picture-of-day/LivePageRefresher";
 
 export const metadata: Metadata = {
   title: "Defense & Aerospace Fact of the Day — Presented by UFK Channel",
@@ -26,11 +27,12 @@ export const metadata: Metadata = {
 
 export default async function PictureOfTheDayPage() {
   const posts = await db.getAllPosts();
-  const featuredPost = posts.find((p) => p.isFeatured) || posts[0];
+  const featuredPost = posts.find((p) => p.isFeatured) || posts[0] || null;
   const pastPosts = posts.filter((p) => p.id !== featuredPost?.id);
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 sm:py-12">
+      <LivePageRefresher />
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         {/* Navigation Breadcrumb */}
         <Link
@@ -94,7 +96,7 @@ export default async function PictureOfTheDayPage() {
         </div>
 
         {/* Live Featured Item Showcase - Adjusted & Balanced Size */}
-        {featuredPost && (
+        {featuredPost ? (
           <div className="rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-200 overflow-hidden mb-12">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
               {/* Image Column - 5/12 columns with Max Height */}
@@ -149,6 +151,28 @@ export default async function PictureOfTheDayPage() {
                 </div>
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-200 p-8 sm:p-12 text-center mb-12">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 mb-4 border border-rose-100 shadow-sm">
+              <Sparkles className="h-7 w-7 text-rose-500" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+              No Featured Stories Currently Published
+            </h2>
+            <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
+              There are currently no featured facts or defense stories published. Check back soon or visit the official UFK Channel for the latest video deep-dives.
+            </p>
+            <a
+              href="https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all"
+            >
+              <YoutubeIcon className="h-4 w-4" />
+              <span>Explore UFK YouTube Channel</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
           </div>
         )}
 

@@ -13,6 +13,6 @@ if (process.env.NODE_ENV !== "production") {
   globalForSSE.sseBroadcaster = sseBroadcaster;
 }
 
-export function broadcastFeaturedUpdate(post: FeaturedPostRecord) {
+export function broadcastFeaturedUpdate(post: FeaturedPostRecord | null) {
   sseBroadcaster.emit("featured_update", post);
 }
