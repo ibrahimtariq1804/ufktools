@@ -778,18 +778,29 @@ export const db = {
       }
     }
 
+    // Distributed serverless cloud persistence
+    const cloudEvents = await fetchAnalyticsFromCloud();
     const store = ensureLocalStore();
-    if (!store.analytics || store.analytics.length === 0) {
-      const cloudEvents = await fetchAnalyticsFromCloud();
-      store.analytics = cloudEvents || [];
+    if (!store.analytics) store.analytics = [];
+
+    // Union merge by event ID to prevent dropped events across concurrent serverless instances
+    const eventMap = new Map<string, AnalyticsEvent>();
+    for (const e of cloudEvents) {
+      eventMap.set(e.id, e);
     }
-    store.analytics.push(record);
-    if (store.analytics.length > 5000) {
-      store.analytics = store.analytics.slice(-5000);
+    for (const e of store.analytics) {
+      eventMap.set(e.id, e);
     }
+    eventMap.set(record.id, record);
+
+    const merged = Array.from(eventMap.values()).sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    store.analytics = merged.slice(-300);
     saveLocalStore(store);
 
-    // Synchronize recent events to persistent cloud store before serverless freeze
+    // Synchronize merged events to persistent cloud store before serverless freeze
     await syncAnalyticsToCloud(store.analytics);
     return record;
   },
