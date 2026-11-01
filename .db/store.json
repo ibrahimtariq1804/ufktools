@@ -3,7 +3,7 @@
     {
       "id": "admin-default-uuid",
       "email": "admin@ufktools.com",
-      "passwordHash": "$2b$10$ghNlomnKcP1CwWZqbCl4tuh2LLcyVdsbEpHwHF1TIu016biJeGtae",
+      "passwordHash": "$2b$10$6cWPgGav65vPa.iSFXY3secRbZEb9t0.u3oXkx7Es82Cc08pXwT4a",
       "name": "UFK Administrator",
       "createdAt": "2026-10-27T20:50:27.349Z",
       "lastLoginAt": "2026-10-28T23:59:12.714Z"

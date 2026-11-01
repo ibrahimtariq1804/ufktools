@@ -44,10 +44,9 @@ export async function POST(request: Request) {
       createdBy: session.adminId,
     });
 
-    // If marked featured, broadcast immediately to all live visitors
-    if (newPost.isFeatured) {
-      broadcastFeaturedUpdate(newPost);
-    }
+    // Broadcast active featured post immediately to all live visitors
+    const currentFeatured = await db.getFeaturedPost();
+    broadcastFeaturedUpdate(currentFeatured);
 
     // Invalidate static / PPR cache across the site
     try {

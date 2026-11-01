@@ -113,9 +113,9 @@ async function ensurePgTables() {
     `);
 
     // Ensure initial admin user exists
-    const check = await pgPool.query("SELECT COUNT(*) FROM admins");
-    if (parseInt(check.rows[0].count, 10) === 0) {
-      const initialEmail = process.env.ADMIN_EMAIL || "admin@ufktools.com";
+    const initialEmail = (process.env.ADMIN_EMAIL || "admin@ufktools.com").trim().toLowerCase();
+    const adminCheck = await pgPool.query("SELECT id FROM admins WHERE LOWER(email) = $1", [initialEmail]);
+    if (adminCheck.rows.length === 0) {
       const initialPassword = process.env.ADMIN_PASSWORD || "admin123";
       const initialName = process.env.ADMIN_NAME || "UFK Administrator";
       const hash = bcrypt.hashSync(initialPassword, 10);
@@ -514,6 +514,49 @@ export const db = {
     );
   },
 
+  async createAdmin(data: { email: string; passwordHash: string; name: string }): Promise<AdminUser> {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const cleanEmail = data.email.trim().toLowerCase();
+    const cleanName = data.name.trim();
+
+    if (pgPool) {
+      try {
+        await ensurePgTables();
+        const res = await pgPool.query(
+          `INSERT INTO admins (id, email, password_hash, name, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $5)
+           ON CONFLICT (email) DO UPDATE SET password_hash = $3, name = $4, updated_at = $5
+           RETURNING id, email, password_hash as "passwordHash", name, created_at as "createdAt", last_login_at as "lastLoginAt"`,
+          [id, cleanEmail, data.passwordHash, cleanName, now]
+        );
+        if (res.rows[0]) return res.rows[0];
+      } catch (err) {
+        console.error("PostgreSQL query error in createAdmin:", err);
+      }
+    }
+
+    const store = ensureLocalStore();
+    const existing = store.admins.find((a) => a.email.toLowerCase() === cleanEmail);
+    if (existing) {
+      existing.passwordHash = data.passwordHash;
+      existing.name = cleanName;
+      saveLocalStore(store);
+      return existing;
+    }
+
+    const newAdmin: AdminUser = {
+      id,
+      email: cleanEmail,
+      passwordHash: data.passwordHash,
+      name: cleanName,
+      createdAt: now,
+    };
+    store.admins.push(newAdmin);
+    saveLocalStore(store);
+    return newAdmin;
+  },
+
   async getAdminById(id: string): Promise<AdminUser | null> {
     if (pgPool) {
       try {
@@ -640,7 +683,18 @@ export const db = {
          WHERE is_featured = TRUE
          LIMIT 1`
       );
-      return res.rows[0] || null;
+      if (res.rows[0]) return res.rows[0];
+
+      // Fallback: If no post is explicitly marked featured, return the latest published post
+      const fallback = await pgPool.query(
+        `SELECT id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
+                thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
+                published_at as "publishedAt", created_at as "createdAt", updated_at as "updatedAt"
+         FROM featured_posts
+         ORDER BY published_at DESC
+         LIMIT 1`
+      );
+      return fallback.rows[0] || null;
     }
 
     const allPosts = await this.getAllPosts();
@@ -844,8 +898,29 @@ export const db = {
   async deletePost(id: string): Promise<boolean> {
     if (pgPool) {
       await ensurePgTables();
-      const res = await pgPool.query("DELETE FROM featured_posts WHERE id = $1", [id]);
-      return (res.rowCount ?? 0) > 0;
+      const client = await pgPool.connect();
+      try {
+        await client.query("BEGIN");
+        const delRes = await client.query("DELETE FROM featured_posts WHERE id = $1 RETURNING is_featured", [id]);
+        const deletedRow = delRes.rows[0];
+        if (deletedRow?.is_featured) {
+          // Atomically promote newest remaining post so site never has an empty featured banner
+          await client.query(`
+            UPDATE featured_posts
+            SET is_featured = TRUE
+            WHERE id = (
+              SELECT id FROM featured_posts ORDER BY published_at DESC LIMIT 1
+            )
+          `);
+        }
+        await client.query("COMMIT");
+        return (delRes.rowCount ?? 0) > 0;
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
     }
 
     // Pull latest cloud posts to ensure complete inventory
