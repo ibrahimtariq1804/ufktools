@@ -35,7 +35,8 @@ yarn-error.log*
 !.env.example
 
 # database & temp uploads
-/.db/
+/.db/*
+!/.db/store.json
 /public/uploads/temp/
 
 # vercel

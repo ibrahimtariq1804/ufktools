@@ -46,11 +46,17 @@ export interface AnalyticsEvent {
   createdAt: string;
 }
 
-// PostgreSQL Pool instance if DATABASE_URL is set
+// PostgreSQL Pool instance if DATABASE_URL or POSTGRES_URL is set (e.g. Vercel Postgres, Supabase, Neon)
+const pgConnectionString =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.POSTGRES_URL_NON_POOLING;
+
 let pgPool: Pool | null = null;
-if (process.env.DATABASE_URL) {
+if (pgConnectionString) {
   pgPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: pgConnectionString,
     ssl: process.env.DATABASE_SSL === "false" ? false : { rejectUnauthorized: false },
   });
 }
@@ -129,7 +135,6 @@ async function ensurePgTables() {
 interface LocalStore {
   admins: AdminUser[];
   posts: FeaturedPostRecord[];
-  deletedPostIds?: string[];
   analytics?: AnalyticsEvent[];
 }
 
@@ -182,11 +187,6 @@ function ensureLocalStore(): LocalStore {
       }
       if (!parsed.analytics) parsed.analytics = [];
       if (!parsed.posts) parsed.posts = [];
-      if (!parsed.deletedPostIds) parsed.deletedPostIds = [];
-      if (parsed.deletedPostIds.length > 0) {
-        const delSet = new Set(parsed.deletedPostIds);
-        parsed.posts = parsed.posts.filter((p) => !delSet.has(p.id));
-      }
       return parsed;
     } catch {}
   }
@@ -208,11 +208,6 @@ function ensureLocalStore(): LocalStore {
       }
       if (!parsed.analytics) parsed.analytics = [];
       if (!parsed.posts) parsed.posts = [];
-      if (!parsed.deletedPostIds) parsed.deletedPostIds = [];
-      if (parsed.deletedPostIds.length > 0) {
-        const delSet = new Set(parsed.deletedPostIds);
-        parsed.posts = parsed.posts.filter((p) => !delSet.has(p.id));
-      }
       try {
         fs.writeFileSync(storeFile, JSON.stringify(parsed, null, 2), "utf-8");
       } catch {}
@@ -240,16 +235,17 @@ function ensureLocalStore(): LocalStore {
     ],
     posts: [
       {
-        id: "post-seed-001",
+        id: "2ad8eaf9-234e-42ee-ad33-a19560f56ae5",
         title: "The James Webb Space Telescope's Cosmic Marvel",
         fact: "Did you know? Light from galaxies captured in deep-field images by modern space observatories has traveled through space for over 13.4 billion years—originating shortly after the dawn of our universe itself.",
         imageUrl:
           "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop",
         imageFilename: "demo-space.jpg",
+        youtubeUrl: "https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8",
         isFeatured: true,
-        publishedAt: "2026-10-28T00:00:00.000Z",
-        createdAt: "2026-10-28T00:00:00.000Z",
-        updatedAt: "2026-10-28T00:00:00.000Z",
+        publishedAt: "2026-10-31T23:44:43.267Z",
+        createdAt: "2026-10-31T23:44:43.267Z",
+        updatedAt: "2026-10-31T23:44:43.267Z",
       },
     ],
     analytics: [],
@@ -385,45 +381,46 @@ const CLOUD_FEATURED_OBJECT_ID = "ff808181a09d98f701a19400392c79b5";
 interface CloudFeaturedResult {
   success: boolean;
   posts: FeaturedPostRecord[];
-  deletedPostIds: string[];
 }
 
 let cachedCloudPosts: CloudFeaturedResult | null = null;
 let lastCloudPostsFetch = 0;
-const CLOUD_POSTS_CACHE_TTL = 5000; // 5-second throttle to prevent rate limits while ensuring fast propagation
+const CLOUD_POSTS_CACHE_TTL = 1000; // 1-second throttle for fast propagation without rate limits
 
-async function syncFeaturedPostsToCloud(
-  posts: FeaturedPostRecord[],
-  deletedPostIds: string[] = []
-): Promise<void> {
-  // Update in-memory cache immediately so all calls within this process are consistent
+async function syncFeaturedPostsToCloud(posts: FeaturedPostRecord[]): Promise<void> {
+  const sanitized = posts.slice(0, 50);
   cachedCloudPosts = {
     success: true,
-    posts: posts.slice(0, 50),
-    deletedPostIds: deletedPostIds.slice(0, 100),
+    posts: sanitized,
   };
   lastCloudPostsFetch = performance.now();
 
   try {
-    await fetch(`https://api.restful-api.dev/objects/${CLOUD_FEATURED_OBJECT_ID}`, {
+    const res = await fetch(`https://api.restful-api.dev/objects/${CLOUD_FEATURED_OBJECT_ID}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: "ufk_featured_posts_store_v1",
         data: {
           lastUpdated: new Date().toISOString(),
-          posts: posts.slice(0, 50),
-          deletedPostIds: deletedPostIds.slice(0, 100),
+          posts: sanitized,
         },
       }),
-      signal: AbortSignal.timeout(3500),
+      signal: AbortSignal.timeout(5000),
     });
+    if (!res.ok) {
+      console.warn("Cloud sync returned non-OK status:", res.status);
+    }
   } catch (err) {
     console.warn("Cloud featured posts sync failed:", err);
   }
 }
 
 async function fetchFeaturedPostsFromCloud(forceFresh = false): Promise<CloudFeaturedResult> {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return { success: false, posts: [] };
+  }
+
   const now = performance.now();
   if (!forceFresh && cachedCloudPosts && now - lastCloudPostsFetch < CLOUD_POSTS_CACHE_TTL) {
     return cachedCloudPosts;
@@ -432,7 +429,7 @@ async function fetchFeaturedPostsFromCloud(forceFresh = false): Promise<CloudFea
   try {
     const res = await fetch(`https://api.restful-api.dev/objects/${CLOUD_FEATURED_OBJECT_ID}`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(3500),
+      signal: AbortSignal.timeout(4000),
     });
     if (res.ok) {
       const json = await res.json();
@@ -440,20 +437,18 @@ async function fetchFeaturedPostsFromCloud(forceFresh = false): Promise<CloudFea
         const result: CloudFeaturedResult = {
           success: true,
           posts: json.data.posts as FeaturedPostRecord[],
-          deletedPostIds: Array.isArray(json.data.deletedPostIds) ? json.data.deletedPostIds : [],
         };
         cachedCloudPosts = result;
         lastCloudPostsFetch = now;
         return result;
       }
     }
-  } catch {
-    // Fall back to local store
+  } catch (err) {
+    console.warn("Cloud featured posts fetch error:", err);
   }
   return {
     success: false,
     posts: [],
-    deletedPostIds: [],
   };
 }
 
@@ -647,42 +642,16 @@ export const db = {
 
     const cloud = await fetchFeaturedPostsFromCloud();
     const store = ensureLocalStore();
-    const deletedSet = new Set(store.deletedPostIds || []);
 
     if (cloud.success) {
-      cloud.deletedPostIds.forEach((id) => deletedSet.add(id));
-      store.deletedPostIds = Array.from(deletedSet);
+      store.posts = cloud.posts;
+      saveLocalStore(store);
+      return cloud.posts;
     }
 
-    // Two-way union merge by ID: preserve local posts while adopting new cloud additions
-    const postMap = new Map<string, FeaturedPostRecord>();
-    if (cloud.success) {
-      for (const p of cloud.posts) {
-        if (!deletedSet.has(p.id)) {
-          postMap.set(p.id, p);
-        }
-      }
-    }
-    for (const p of store.posts) {
-      if (!deletedSet.has(p.id)) {
-        if (!postMap.has(p.id)) {
-          postMap.set(p.id, p);
-        }
-      }
-    }
-
-    const merged = Array.from(postMap.values()).sort(
+    return [...store.posts].sort(
       (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     );
-
-    // If local store has posts that were not yet on the cloud, sync merged list to cloud in background
-    if (cloud.success && postMap.size > cloud.posts.length) {
-      syncFeaturedPostsToCloud(merged, store.deletedPostIds).catch(() => {});
-    }
-
-    store.posts = merged;
-    saveLocalStore(store);
-    return merged;
   },
 
   async getPostById(id: string): Promise<FeaturedPostRecord | null> {
@@ -758,22 +727,12 @@ export const db = {
     // Pull latest cloud posts to ensure complete inventory
     const cloud = await fetchFeaturedPostsFromCloud(true);
     const store = ensureLocalStore();
-    const deletedSet = new Set(store.deletedPostIds || []);
-
-    const postMap = new Map<string, FeaturedPostRecord>();
-    if (cloud.success) {
-      for (const p of cloud.posts) {
-        if (!deletedSet.has(p.id)) postMap.set(p.id, p);
-      }
-    }
-    for (const p of store.posts) {
-      if (!deletedSet.has(p.id)) postMap.set(p.id, p);
-    }
+    const existingPosts = cloud.success ? cloud.posts : store.posts;
 
     if (data.isFeatured) {
-      postMap.forEach((p) => {
+      for (const p of existingPosts) {
         p.isFeatured = false;
-      });
+      }
     }
 
     const newRecord: FeaturedPostRecord = {
@@ -791,19 +750,13 @@ export const db = {
       updatedAt: now,
     };
 
-    postMap.set(id, newRecord);
-
-    const mergedPosts = Array.from(postMap.values()).sort(
+    const updatedPosts = [newRecord, ...existingPosts.filter((p) => p.id !== id)].sort(
       (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     );
 
-    if (store.deletedPostIds) {
-      store.deletedPostIds = store.deletedPostIds.filter((d) => d !== id);
-    }
-
-    store.posts = mergedPosts;
+    store.posts = updatedPosts;
     saveLocalStore(store);
-    await syncFeaturedPostsToCloud(store.posts, store.deletedPostIds || []);
+    await syncFeaturedPostsToCloud(updatedPosts);
     return newRecord;
   },
 
@@ -837,20 +790,10 @@ export const db = {
     // Pull latest cloud posts to ensure complete inventory
     const cloud = await fetchFeaturedPostsFromCloud(true);
     const store = ensureLocalStore();
-    const deletedSet = new Set(store.deletedPostIds || []);
-
-    const postMap = new Map<string, FeaturedPostRecord>();
-    if (cloud.success) {
-      for (const p of cloud.posts) {
-        if (!deletedSet.has(p.id)) postMap.set(p.id, p);
-      }
-    }
-    for (const p of store.posts) {
-      if (!deletedSet.has(p.id)) postMap.set(p.id, p);
-    }
+    const existingPosts = cloud.success ? cloud.posts : store.posts;
 
     let targetPost: FeaturedPostRecord | null = null;
-    postMap.forEach((p) => {
+    for (const p of existingPosts) {
       if (p.id === id) {
         p.isFeatured = true;
         p.publishedAt = now;
@@ -859,14 +802,15 @@ export const db = {
       } else {
         p.isFeatured = false;
       }
-    });
+    }
 
     if (targetPost) {
-      store.posts = Array.from(postMap.values()).sort(
+      const updatedPosts = [...existingPosts].sort(
         (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
       );
+      store.posts = updatedPosts;
       saveLocalStore(store);
-      await syncFeaturedPostsToCloud(store.posts, store.deletedPostIds || []);
+      await syncFeaturedPostsToCloud(updatedPosts);
     }
     return targetPost;
   },
@@ -877,40 +821,18 @@ export const db = {
       return (res.rowCount ?? 0) > 0;
     }
 
-    const store = ensureLocalStore();
-    if (!store.deletedPostIds) store.deletedPostIds = [];
-    if (!store.deletedPostIds.includes(id)) {
-      store.deletedPostIds.push(id);
-    }
-    const deletedSet = new Set(store.deletedPostIds);
-
     // Pull latest cloud posts to ensure complete inventory
     const cloud = await fetchFeaturedPostsFromCloud(true);
-    if (cloud.success) {
-      cloud.deletedPostIds.forEach((d) => deletedSet.add(d));
-      store.deletedPostIds = Array.from(deletedSet);
+    const store = ensureLocalStore();
+    const existingPosts = cloud.success ? cloud.posts : store.posts;
+
+    const target = existingPosts.find((p) => p.id === id);
+    if (!target) {
+      return false;
     }
 
-    const postMap = new Map<string, FeaturedPostRecord>();
-    if (cloud.success) {
-      for (const p of cloud.posts) {
-        if (!deletedSet.has(p.id)) {
-          postMap.set(p.id, p);
-        }
-      }
-    }
-    for (const p of store.posts) {
-      if (!deletedSet.has(p.id)) {
-        postMap.set(p.id, p);
-      }
-    }
-
-    const wasFeatured = postMap.get(id)?.isFeatured;
-    postMap.delete(id);
-
-    const remaining = Array.from(postMap.values()).sort(
-      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-    );
+    const wasFeatured = target.isFeatured;
+    const remaining = existingPosts.filter((p) => p.id !== id);
 
     // If deleted post was featured and other posts remain, promote the newest remaining post
     if (wasFeatured && remaining.length > 0) {
@@ -920,11 +842,9 @@ export const db = {
       }
     }
 
-    // Crucial: If remaining is empty, store.posts remains []! Never resurrect seed post!
     store.posts = remaining;
     saveLocalStore(store);
-
-    await syncFeaturedPostsToCloud(store.posts, store.deletedPostIds);
+    await syncFeaturedPostsToCloud(remaining);
     return true;
   },
 

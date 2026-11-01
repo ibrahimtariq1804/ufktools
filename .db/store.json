@@ -1,0 +1,27 @@
+{
+  "admins": [
+    {
+      "id": "admin-default-uuid",
+      "email": "admin@ufktools.com",
+      "passwordHash": "$2b$10$ghNlomnKcP1CwWZqbCl4tuh2LLcyVdsbEpHwHF1TIu016biJeGtae",
+      "name": "UFK Administrator",
+      "createdAt": "2026-10-27T20:50:27.349Z",
+      "lastLoginAt": "2026-10-28T23:59:12.714Z"
+    }
+  ],
+  "posts": [
+    {
+      "id": "2ad8eaf9-234e-42ee-ad33-a19560f56ae5",
+      "title": "The James Webb Space Telescope's Cosmic Marvel",
+      "fact": "Did you know? Light from galaxies captured in deep-field images by modern space observatories has traveled through space for over 13.4 billion years—originating shortly after the dawn of our universe itself.",
+      "imageUrl": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop",
+      "imageFilename": "demo-space.jpg",
+      "youtubeUrl": "https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8",
+      "isFeatured": true,
+      "publishedAt": "2026-10-31T23:44:43.267Z",
+      "createdAt": "2026-10-31T23:44:43.267Z",
+      "updatedAt": "2026-10-31T23:44:43.267Z"
+    }
+  ],
+  "analytics": []
+}
