@@ -125,6 +125,27 @@ async function ensurePgTables() {
       );
     }
 
+    // Ensure initial featured post exists
+    const checkPosts = await pgPool.query("SELECT COUNT(*) FROM featured_posts");
+    if (parseInt(checkPosts.rows[0].count, 10) === 0) {
+      await pgPool.query(
+        `INSERT INTO featured_posts (id, title, fact, image_url, image_filename, youtube_url, is_featured, published_at, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          "2ad8eaf9-234e-42ee-ad33-a19560f56ae5",
+          "The James Webb Space Telescope's Cosmic Marvel",
+          "Did you know? Light from galaxies captured in deep-field images by modern space observatories has traveled through space for over 13.4 billion years—originating shortly after the dawn of our universe itself.",
+          "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop",
+          "demo-space.jpg",
+          "https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8",
+          true,
+          "2026-10-31T23:44:43.267Z",
+          "2026-10-31T23:44:43.267Z",
+          "2026-10-31T23:44:43.267Z",
+        ]
+      );
+    }
+
     ensuredPgSchema = true;
   } catch (err) {
     console.error("Error ensuring PostgreSQL tables:", err);
@@ -610,6 +631,7 @@ export const db = {
   // Featured Post Operations
   async getFeaturedPost(): Promise<FeaturedPostRecord | null> {
     if (pgPool) {
+      await ensurePgTables();
       const res = await pgPool.query(
         `SELECT id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
                 thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
@@ -630,6 +652,7 @@ export const db = {
 
   async getAllPosts(): Promise<FeaturedPostRecord[]> {
     if (pgPool) {
+      await ensurePgTables();
       const res = await pgPool.query(
         `SELECT id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
                 thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
@@ -656,6 +679,7 @@ export const db = {
 
   async getPostById(id: string): Promise<FeaturedPostRecord | null> {
     if (pgPool) {
+      await ensurePgTables();
       const res = await pgPool.query(
         `SELECT id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
                 thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
@@ -685,6 +709,7 @@ export const db = {
     const id = crypto.randomUUID();
 
     if (pgPool) {
+      await ensurePgTables();
       const client = await pgPool.connect();
       try {
         await client.query("BEGIN");
@@ -764,6 +789,7 @@ export const db = {
     const now = new Date().toISOString();
 
     if (pgPool) {
+      await ensurePgTables();
       const client = await pgPool.connect();
       try {
         await client.query("BEGIN");
@@ -817,6 +843,7 @@ export const db = {
 
   async deletePost(id: string): Promise<boolean> {
     if (pgPool) {
+      await ensurePgTables();
       const res = await pgPool.query("DELETE FROM featured_posts WHERE id = $1", [id]);
       return (res.rowCount ?? 0) > 0;
     }
