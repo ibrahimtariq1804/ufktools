@@ -4,26 +4,29 @@ import { db } from "@/lib/db";
 export async function GET(request: Request) {
   try {
     const _url = request.url;
-    const post = await db.getFeaturedPost();
-    if (!post) {
-      return NextResponse.json(
-        { post: null },
-        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
-      );
-    }
+    const posts = await db.getAllPosts();
+    const featuredPost = posts.find((p) => p.isFeatured) || posts[0] || null;
+    const pastPosts = posts.filter((p) => p.id !== featuredPost?.id);
+
+    const sanitizePost = (p: typeof featuredPost) =>
+      p
+        ? {
+            id: p.id,
+            title: p.title,
+            fact: p.fact,
+            imageUrl: p.imageUrl,
+            thumbnailUrl: p.thumbnailUrl,
+            youtubeUrl: p.youtubeUrl,
+            publishedAt: p.publishedAt,
+            isFeatured: p.isFeatured,
+          }
+        : null;
 
     return NextResponse.json(
       {
-        post: {
-          id: post.id,
-          title: post.title,
-          fact: post.fact,
-          imageUrl: post.imageUrl,
-          thumbnailUrl: post.thumbnailUrl,
-          youtubeUrl: post.youtubeUrl,
-          publishedAt: post.publishedAt,
-          isFeatured: post.isFeatured,
-        },
+        post: sanitizePost(featuredPost),
+        posts: posts.map((p) => sanitizePost(p)!),
+        pastPosts: pastPosts.map((p) => sanitizePost(p)!),
       },
       {
         headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
