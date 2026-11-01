@@ -875,6 +875,10 @@ export const db = {
     return true;
   },
 
+  isPostgresConnected(): boolean {
+    return Boolean(pgPool);
+  },
+
   async getStats() {
     const allPosts = await this.getAllPosts();
     const featured = allPosts.find((p) => p.isFeatured) || null;

@@ -6,6 +6,7 @@ import { PopularTools } from "@/components/home/PopularTools";
 import { CategoryShowcase } from "@/components/home/CategoryShowcase";
 import { ToolDirectory } from "@/components/home/ToolDirectory";
 import { ValueProps } from "@/components/home/ValueProps";
+import { db } from "@/lib/db";
 
 export const metadata: Metadata = {
   title: "UFK Tools — All the Online Tools You Need in One Place",
@@ -32,14 +33,28 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const post = await db.getFeaturedPost();
+  const initialPost = post
+    ? {
+        id: post.id,
+        title: post.title,
+        fact: post.fact,
+        imageUrl: post.imageUrl,
+        thumbnailUrl: post.thumbnailUrl,
+        youtubeUrl: post.youtubeUrl,
+        publishedAt: post.publishedAt,
+        isFeatured: post.isFeatured,
+      }
+    : null;
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* 1. Hero Section */}
       <Hero />
 
       {/* 2. Flagship Highlight: Picture / Fact of the Day */}
-      <FeaturedHighlight />
+      <FeaturedHighlight initialPost={initialPost} />
 
       {/* 3. Popular Tools Grid */}
       <PopularTools />

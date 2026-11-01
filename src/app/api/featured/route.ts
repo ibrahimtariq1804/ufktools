@@ -24,6 +24,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
+        database: db.isPostgresConnected() ? "postgres" : "local-ephemeral",
         post: sanitizePost(featuredPost),
         posts: posts.map((p) => sanitizePost(p)!),
         pastPosts: pastPosts.map((p) => sanitizePost(p)!),
