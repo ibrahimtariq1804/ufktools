@@ -192,6 +192,7 @@ export default function ManageFeaturedPage() {
       );
 
       setTimeout(() => {
+        router.refresh();
         router.push("/admin/dashboard/history");
       }, 1500);
     } catch (err: unknown) {

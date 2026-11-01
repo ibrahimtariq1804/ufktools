@@ -89,7 +89,35 @@ export async function POST(request: Request) {
       }
     }
 
-    // Option 2: Local Disk Storage if filesystem is writable (Local Dev, Docker, VPS)
+    // Option 2: Cloud CDN Upload (Catbox.moe permanent free hosting - visible to all clients worldwide)
+    try {
+      const catboxForm = new FormData();
+      catboxForm.append("reqtype", "fileupload");
+      const blob = new Blob([buffer], { type: file.type || "image/jpeg" });
+      catboxForm.append("fileToUpload", blob, uniqueFilename);
+
+      const catboxRes = await fetch("https://catbox.moe/user/api.php", {
+        method: "POST",
+        body: catboxForm,
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (catboxRes.ok) {
+        const directUrl = (await catboxRes.text()).trim();
+        if (directUrl.startsWith("http")) {
+          return NextResponse.json({
+            success: true,
+            url: directUrl,
+            filename: uniqueFilename,
+            size: file.size,
+          });
+        }
+      }
+    } catch (catboxErr) {
+      console.warn("Catbox cloud upload error, falling back to local/data storage:", catboxErr);
+    }
+
+    // Option 3: Local Disk Storage if filesystem is writable (Local Dev or VPS)
     let isLocalDiskWritable = false;
     const uploadDir = path.join(process.cwd(), "public", "uploads", "featured");
     try {
@@ -116,36 +144,8 @@ export async function POST(request: Request) {
           size: file.size,
         });
       } catch (writeErr) {
-        console.warn("Local disk write error, falling back to cloud/data URI:", writeErr);
+        console.warn("Local disk write error, falling back to Data URI:", writeErr);
       }
-    }
-
-    // Option 3: Serverless Cloud Upload (Catbox.moe permanent free hosting)
-    try {
-      const catboxForm = new FormData();
-      catboxForm.append("reqtype", "fileupload");
-      const blob = new Blob([buffer], { type: file.type || "image/jpeg" });
-      catboxForm.append("fileToUpload", blob, uniqueFilename);
-
-      const catboxRes = await fetch("https://catbox.moe/user/api.php", {
-        method: "POST",
-        body: catboxForm,
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (catboxRes.ok) {
-        const directUrl = (await catboxRes.text()).trim();
-        if (directUrl.startsWith("http")) {
-          return NextResponse.json({
-            success: true,
-            url: directUrl,
-            filename: uniqueFilename,
-            size: file.size,
-          });
-        }
-      }
-    } catch (catboxErr) {
-      console.warn("Catbox cloud upload error, falling back to Base64 Data URI:", catboxErr);
     }
 
     // Option 4: Zero-dependency Serverless Base64 Data URI (100% resilient fallback)

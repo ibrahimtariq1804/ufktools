@@ -390,7 +390,7 @@ interface CloudFeaturedResult {
 
 let cachedCloudPosts: CloudFeaturedResult | null = null;
 let lastCloudPostsFetch = 0;
-const CLOUD_POSTS_CACHE_TTL = 15000; // 15-second throttle to prevent rate limits
+const CLOUD_POSTS_CACHE_TTL = 5000; // 5-second throttle to prevent rate limits while ensuring fast propagation
 
 async function syncFeaturedPostsToCloud(
   posts: FeaturedPostRecord[],
@@ -652,16 +652,37 @@ export const db = {
     if (cloud.success) {
       cloud.deletedPostIds.forEach((id) => deletedSet.add(id));
       store.deletedPostIds = Array.from(deletedSet);
-      store.posts = cloud.posts.filter((p) => !deletedSet.has(p.id));
-      saveLocalStore(store);
-      return store.posts;
     }
 
-    // Local fallback
-    store.posts = store.posts.filter((p) => !deletedSet.has(p.id));
-    return [...store.posts].sort(
+    // Two-way union merge by ID: preserve local posts while adopting new cloud additions
+    const postMap = new Map<string, FeaturedPostRecord>();
+    if (cloud.success) {
+      for (const p of cloud.posts) {
+        if (!deletedSet.has(p.id)) {
+          postMap.set(p.id, p);
+        }
+      }
+    }
+    for (const p of store.posts) {
+      if (!deletedSet.has(p.id)) {
+        if (!postMap.has(p.id)) {
+          postMap.set(p.id, p);
+        }
+      }
+    }
+
+    const merged = Array.from(postMap.values()).sort(
       (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     );
+
+    // If local store has posts that were not yet on the cloud, sync merged list to cloud in background
+    if (cloud.success && postMap.size > cloud.posts.length) {
+      syncFeaturedPostsToCloud(merged, store.deletedPostIds).catch(() => {});
+    }
+
+    store.posts = merged;
+    saveLocalStore(store);
+    return merged;
   },
 
   async getPostById(id: string): Promise<FeaturedPostRecord | null> {
@@ -775,6 +796,10 @@ export const db = {
     const mergedPosts = Array.from(postMap.values()).sort(
       (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     );
+
+    if (store.deletedPostIds) {
+      store.deletedPostIds = store.deletedPostIds.filter((d) => d !== id);
+    }
 
     store.posts = mergedPosts;
     saveLocalStore(store);
