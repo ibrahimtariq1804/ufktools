@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   UploadCloud,
@@ -11,6 +11,7 @@ import {
   Radio,
   Image as ImageIcon,
   X,
+  RotateCcw,
 } from "lucide-react";
 
 export default function ManageFeaturedPage() {
@@ -32,6 +33,25 @@ export default function ManageFeaturedPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const resetForm = () => {
+    setTitle("");
+    setFact("");
+    setYoutubeUrl("https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8");
+    setIsFeatured(true);
+    setPreviewUrl(null);
+    setUploadedUrl(null);
+    setUploadedFilename(null);
+    setErrorMessage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // Always guarantee the form starts completely fresh and pristine on mount
+  useEffect(() => {
+    resetForm();
+  }, []);
 
   async function optimizeImageFile(file: File): Promise<File> {
     return new Promise((resolve) => {
@@ -191,6 +211,9 @@ export default function ManageFeaturedPage() {
         "Published successfully! Live homepage visitors have received this update in real time via Server-Sent Events."
       );
 
+      // Cleanly reset the form so subsequent visits start completely fresh
+      resetForm();
+
       setTimeout(() => {
         router.refresh();
         router.push("/admin/dashboard/history");
@@ -233,6 +256,7 @@ export default function ManageFeaturedPage() {
         <div className="lg:col-span-7">
           <form
             onSubmit={handleSubmit}
+            autoComplete="off"
             className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-6"
           >
             {/* Image Uploader */}
@@ -295,6 +319,7 @@ export default function ManageFeaturedPage() {
               <input
                 type="text"
                 required
+                autoComplete="off"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., The James Webb Space Telescope's Cosmic Marvel"
@@ -313,6 +338,7 @@ export default function ManageFeaturedPage() {
               <textarea
                 required
                 rows={4}
+                autoComplete="off"
                 value={fact}
                 onChange={(e) => setFact(e.target.value)}
                 placeholder="The F-35's AN/AAQ-37 DAS uses six infrared sensors embedded around the airframe..."
@@ -327,6 +353,7 @@ export default function ManageFeaturedPage() {
               </label>
               <input
                 type="url"
+                autoComplete="off"
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
                 placeholder="https://youtube.com/watch?v=... or https://youtube.com/@ufk"
@@ -354,15 +381,27 @@ export default function ManageFeaturedPage() {
               </label>
             </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isSubmitting || isUploading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition-all disabled:opacity-50"
-            >
-              <Sparkles className="h-4 w-4" />
-              <span>{isSubmitting ? "Broadcasting to Homepage..." : "Publish & Broadcast Live"}</span>
-            </button>
+            {/* Submit & Reset Buttons */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={resetForm}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-3.5 text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>Clear Form</span>
+              </button>
+
+              <button
+                type="submit"
+                disabled={isSubmitting || isUploading}
+                className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>{isSubmitting ? "Broadcasting to Homepage..." : "Publish & Broadcast Live"}</span>
+              </button>
+            </div>
           </form>
         </div>
 
