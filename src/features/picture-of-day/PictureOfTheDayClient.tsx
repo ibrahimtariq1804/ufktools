@@ -10,7 +10,6 @@ import {
   Radio,
   ExternalLink,
   ShieldCheck,
-  CheckCircle2,
 } from "lucide-react";
 import { YoutubeIcon } from "@/components/ui/BrandIcons";
 import { FeaturedPost } from "./useFeaturedPost";
@@ -103,7 +102,7 @@ export function PictureOfTheDayClient({
         </Link>
 
         {/* Page Header */}
-        <div className="mb-8 text-center sm:text-left">
+        <div className="mb-6 text-center sm:text-left">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 border border-rose-200 mb-2.5">
             <Sparkles className="h-3.5 w-3.5 fill-rose-600 text-rose-600" />
             <span>Official UFK Channel Curation</span>
@@ -116,50 +115,12 @@ export function PictureOfTheDayClient({
           </p>
         </div>
 
-        {/* Official YouTube Channel Spotlight Banner */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-red-950 p-5 sm:p-6 text-white border border-slate-800 shadow-lg mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white shadow-md shadow-red-600/30">
-                <YoutubeIcon className="h-6 w-6 text-white" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base sm:text-lg font-bold tracking-tight text-white">
-                    UFK Channel (@UFK)
-                  </h2>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-semibold text-red-300 border border-red-500/30">
-                    <CheckCircle2 className="h-3 w-3 text-red-400" />
-                    Official
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
-                  In-depth, unbiased military analyses, fighter jet market breakdowns, and global defense economics. Pure facts, zero clickbait.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center shrink-0">
-              <a
-                href="https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-500 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-red-600/30 transition-all"
-              >
-                <YoutubeIcon className="h-3.5 w-3.5" />
-                <span>Visit Channel</span>
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          </div>
-        </div>
-
         {/* Live Featured Item Showcase */}
         {featuredPost ? (
           <div className="rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-200 overflow-hidden mb-12 animate-in fade-in duration-300">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
               {/* Image Column */}
-              <div className="lg:col-span-5 h-64 sm:h-80 lg:h-auto lg:min-h-[320px] lg:max-h-[380px] overflow-hidden bg-slate-900 group relative">
+              <div className="lg:col-span-7 h-80 sm:h-[28rem] lg:h-auto lg:min-h-[28rem] overflow-hidden bg-slate-900 group relative">
                 <img
                   src={featuredPost.imageUrl}
                   alt={featuredPost.title}
@@ -171,7 +132,7 @@ export function PictureOfTheDayClient({
               </div>
 
               {/* Content Column */}
-              <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between">
+              <div className="lg:col-span-5 p-6 sm:p-8 lg:p-9 flex flex-col justify-between">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
