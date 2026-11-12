@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { TOOLS, getToolBySlug } from "@/config/tools.config";
 import { ToolPageShell } from "@/components/tools/ToolPageShell";
 import { ToolViewTracker } from "@/components/tools/ToolViewTracker";
+import { ToolEducationalContent } from "@/components/tools/ToolEducationalContent";
 
 // Phase 3 Specialized Tool Implementations
 import { MergePdfTool } from "@/features/pdf-tools/MergePdfTool";
@@ -160,6 +161,11 @@ export default async function ToolPage({ params }: ToolPageProps) {
       />
       <ToolViewTracker toolSlug={tool.slug} />
       {renderToolComponent()}
+      <div className="bg-slate-50 pb-20">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+          <ToolEducationalContent tool={tool} />
+        </div>
+      </div>
     </>
   );
 }

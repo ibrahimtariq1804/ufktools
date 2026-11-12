@@ -11,6 +11,7 @@ export interface FeaturedPost {
   youtubeUrl?: string;
   publishedAt: string;
   isFeatured: boolean;
+  likes?: number;
 }
 
 const DEFAULT_DEMO_POST: FeaturedPost = {

@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Sparkles,
@@ -11,8 +11,15 @@ import {
   ArrowRight,
   Radio,
   ExternalLink,
+  Heart,
+  Copy,
 } from "lucide-react";
-import { YoutubeIcon } from "@/components/ui/BrandIcons";
+import {
+  YoutubeIcon,
+  FacebookIcon,
+  XTwitterIcon,
+  InstagramIcon,
+} from "@/components/ui/BrandIcons";
 import { useFeaturedPost, FeaturedPost } from "@/features/picture-of-day/useFeaturedPost";
 
 interface FeaturedHighlightProps {
@@ -22,6 +29,19 @@ interface FeaturedHighlightProps {
 export function FeaturedHighlight({ initialPost }: FeaturedHighlightProps) {
   const { post } = useFeaturedPost(initialPost);
   const [copied, setCopied] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState<number>(initialPost?.likes ?? 0);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (post) {
+      setLikesCount(post.likes ?? 0);
+      try {
+        const stored = localStorage.getItem(`ufk_liked_${post.id}`);
+        if (stored === "true") setIsLiked(true);
+      } catch {}
+    }
+  }, [post]);
 
   if (!post) {
     return null;
@@ -33,17 +53,71 @@ export function FeaturedHighlight({ initialPost }: FeaturedHighlightProps) {
     year: "numeric",
   });
 
-  const handleShare = () => {
-    if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
+  const handleLike = async () => {
+    if (isLiked) {
+      setToast("You already liked this discovery!");
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
+
+    setIsLiked(true);
+    setLikesCount((prev) => prev + 1);
+    try {
+      localStorage.setItem(`ufk_liked_${post.id}`, "true");
+    } catch {}
+
+    try {
+      const res = await fetch(`/api/featured/${post.id}/like`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.likes === "number") setLikesCount(data.likes);
+      }
+    } catch {}
+  };
+
+  const handleShareFacebook = () => {
+    const url = typeof window !== "undefined" ? `${window.location.origin}/picture-of-the-day` : "https://ufktools.com/picture-of-the-day";
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, "_blank", "width=600,height=500");
+  };
+
+  const handleShareX = () => {
+    const url = typeof window !== "undefined" ? `${window.location.origin}/picture-of-the-day` : "https://ufktools.com/picture-of-the-day";
+    const text = `${post.title} — Fact of the Day via @ufk`;
+    window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank", "width=600,height=500");
+  };
+
+  const handleShareInstagram = () => {
+    const url = typeof window !== "undefined" ? `${window.location.origin}/picture-of-the-day` : "https://ufktools.com/picture-of-the-day";
+    const text = `${post.title}\n\nDid You Know?\n${post.fact}\n\nExplore daily defense & aerospace facts: ${url}`;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setToast("Caption & link copied for Instagram!");
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
+  const handleCopy = () => {
+    if (typeof window !== "undefined" && navigator.clipboard) {
+      const url = `${window.location.origin}/picture-of-the-day`;
+      navigator.clipboard.writeText(url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setToast("Link copied to clipboard!");
+      setTimeout(() => {
+        setCopied(false);
+        setToast(null);
+      }, 2500);
     }
   };
 
   return (
     <section className="relative -mt-6 sm:-mt-8 z-20 mx-auto max-w-5xl px-4 sm:px-6">
       <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-200/90 hover:shadow-2xl transition-all">
+        {toast && (
+          <div className="absolute top-3 right-4 z-50 rounded-xl bg-slate-900 text-white text-xs px-3.5 py-1.5 shadow-lg border border-slate-700 animate-in fade-in">
+            {toast}
+          </div>
+        )}
+
         {/* Top Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-blue-50/25 to-purple-50/30 px-5 py-2.5 sm:px-6">
           <div className="flex items-center gap-2.5">
@@ -65,27 +139,42 @@ export function FeaturedHighlight({ initialPost }: FeaturedHighlightProps) {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={handleShare}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs border border-slate-200 hover:bg-slate-50 transition-colors"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-emerald-600" />
-                  <span className="text-emerald-600">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="h-3.5 w-3.5 text-slate-500" />
-                  <span>Share</span>
-                </>
-              )}
-            </button>
+          <div className="flex items-center gap-2">
+            {/* Social Share Pills */}
+            <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200/80 shadow-xs">
+              <button
+                onClick={handleShareFacebook}
+                title="Share to Facebook"
+                className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+              >
+                <FacebookIcon className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={handleShareX}
+                title="Share to X"
+                className="p-1 rounded text-slate-400 hover:text-black hover:bg-slate-100 transition-colors"
+              >
+                <XTwitterIcon className="h-3 w-3" />
+              </button>
+              <button
+                onClick={handleShareInstagram}
+                title="Share to Instagram"
+                className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              >
+                <InstagramIcon className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={handleCopy}
+                title="Copy Link"
+                className="p-1 rounded text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
 
             <Link
               href="/picture-of-the-day"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors ml-1"
             >
               <span>Full Story</span>
               <ArrowRight className="h-3 w-3" />
@@ -93,9 +182,9 @@ export function FeaturedHighlight({ initialPost }: FeaturedHighlightProps) {
           </div>
         </div>
 
-        {/* Content Body Grid - Well Proportioned */}
+        {/* Content Body Grid */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-0">
-          {/* Featured Image - 260px-285px Height */}
+          {/* Featured Image */}
           <div className="relative md:col-span-5 h-52 md:h-auto md:min-h-[260px] md:max-h-[290px] overflow-hidden bg-slate-950 group">
             <img
               src={post.imageUrl}
@@ -112,11 +201,32 @@ export function FeaturedHighlight({ initialPost }: FeaturedHighlightProps) {
           {/* Fact & Description Panel */}
           <div className="md:col-span-7 flex flex-col justify-between p-5 sm:p-6 bg-white">
             <div className="space-y-2.5">
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-                <Calendar className="h-3 w-3 text-blue-600" />
-                <span>{formattedDate}</span>
-                <span>•</span>
-                <span className="text-blue-600 font-semibold">Intelligence Brief</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
+                  <Calendar className="h-3 w-3 text-blue-600" />
+                  <span>{formattedDate}</span>
+                  <span>•</span>
+                  <span className="text-blue-600 font-semibold">Intelligence Brief</span>
+                </div>
+
+                {/* Like Button */}
+                <button
+                  type="button"
+                  onClick={handleLike}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all shadow-xs ${
+                    isLiked
+                      ? "bg-rose-50 text-rose-600 border border-rose-300"
+                      : "bg-slate-50 text-slate-600 border border-slate-200 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50"
+                  }`}
+                  title={isLiked ? "You liked this post" : "Like this discovery"}
+                >
+                  <Heart
+                    className={`h-3.5 w-3.5 ${
+                      isLiked ? "fill-rose-500 text-rose-500" : "text-slate-400"
+                    }`}
+                  />
+                  <span>{likesCount}</span>
+                </button>
               </div>
 
               <h3 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight leading-snug line-clamp-2">

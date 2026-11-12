@@ -24,6 +24,7 @@ export interface FeaturedPostRecord {
   youtubeUrl?: string;
   isFeatured: boolean;
   publishedAt: string;
+  likes?: number;
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
@@ -85,11 +86,14 @@ async function ensurePgTables() {
         thumbnail_url VARCHAR(500),
         youtube_url VARCHAR(500),
         is_featured BOOLEAN NOT NULL DEFAULT FALSE,
+        likes INTEGER NOT NULL DEFAULT 0,
         published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         created_by VARCHAR(64),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE featured_posts ADD COLUMN IF NOT EXISTS likes INTEGER NOT NULL DEFAULT 0;
 
       CREATE TABLE IF NOT EXISTS analytics_events (
         id VARCHAR(64) PRIMARY KEY,
@@ -678,6 +682,7 @@ export const db = {
       const res = await pgPool.query(
         `SELECT id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
                 thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
+                COALESCE(likes, 0) as "likes",
                 published_at as "publishedAt", created_at as "createdAt", updated_at as "updatedAt"
          FROM featured_posts
          WHERE is_featured = TRUE
@@ -689,6 +694,7 @@ export const db = {
       const fallback = await pgPool.query(
         `SELECT id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
                 thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
+                COALESCE(likes, 0) as "likes",
                 published_at as "publishedAt", created_at as "createdAt", updated_at as "updatedAt"
          FROM featured_posts
          ORDER BY published_at DESC
@@ -710,6 +716,7 @@ export const db = {
       const res = await pgPool.query(
         `SELECT id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
                 thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
+                COALESCE(likes, 0) as "likes",
                 published_at as "publishedAt", created_at as "createdAt", updated_at as "updatedAt"
          FROM featured_posts
          ORDER BY published_at DESC`
@@ -737,6 +744,7 @@ export const db = {
       const res = await pgPool.query(
         `SELECT id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
                 thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
+                COALESCE(likes, 0) as "likes",
                 published_at as "publishedAt", created_at as "createdAt", updated_at as "updatedAt"
          FROM featured_posts
          WHERE id = $1`,
@@ -773,10 +781,11 @@ export const db = {
         }
 
         const res = await client.query(
-          `INSERT INTO featured_posts (id, title, fact, image_url, image_filename, thumbnail_url, youtube_url, is_featured, published_at, created_by, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          `INSERT INTO featured_posts (id, title, fact, image_url, image_filename, thumbnail_url, youtube_url, is_featured, likes, published_at, created_by, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10, $11, $12)
            RETURNING id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
                      thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
+                     COALESCE(likes, 0) as "likes",
                      published_at as "publishedAt", created_at as "createdAt", updated_at as "updatedAt"`,
           [
             id,
@@ -823,6 +832,7 @@ export const db = {
       thumbnailUrl: data.thumbnailUrl,
       youtubeUrl: data.youtubeUrl,
       isFeatured: data.isFeatured,
+      likes: 0,
       publishedAt: now,
       createdBy: data.createdBy,
       createdAt: now,
@@ -854,6 +864,7 @@ export const db = {
            WHERE id = $2
            RETURNING id, title, fact, image_url as "imageUrl", image_filename as "imageFilename",
                      thumbnail_url as "thumbnailUrl", youtube_url as "youtubeUrl", is_featured as "isFeatured",
+                     COALESCE(likes, 0) as "likes",
                      published_at as "publishedAt", created_at as "createdAt", updated_at as "updatedAt"`,
           [now, id]
         );
@@ -950,6 +961,30 @@ export const db = {
     return true;
   },
 
+  async likePost(id: string): Promise<number> {
+    if (pgPool) {
+      await ensurePgTables();
+      const res = await pgPool.query(
+        `UPDATE featured_posts
+         SET likes = COALESCE(likes, 0) + 1
+         WHERE id = $1
+         RETURNING COALESCE(likes, 0) as "likes"`,
+        [id]
+      );
+      return res.rows[0]?.likes ?? 0;
+    }
+
+    const store = ensureLocalStore();
+    const post = store.posts.find((p) => p.id === id);
+    if (post) {
+      post.likes = (post.likes || 0) + 1;
+      saveLocalStore(store);
+      await syncFeaturedPostsToCloud(store.posts);
+      return post.likes;
+    }
+    return 0;
+  },
+
   isPostgresConnected(): boolean {
     return Boolean(pgPool);
   },
@@ -957,9 +992,12 @@ export const db = {
   async getStats() {
     const allPosts = await this.getAllPosts();
     const featured = allPosts.find((p) => p.isFeatured) || null;
+    const totalLikes = allPosts.reduce((sum, p) => sum + (p.likes || 0), 0);
     return {
       totalPosts: allPosts.length,
+      totalLikes,
       featuredTitle: featured ? featured.title : "None",
+      featuredLikes: featured ? (featured.likes || 0) : 0,
       lastPublished: featured ? featured.publishedAt : null,
     };
   },

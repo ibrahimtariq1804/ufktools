@@ -52,6 +52,9 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+  },
 };
 
 export default function RootLayout({
@@ -81,7 +84,17 @@ export default function RootLayout({
         "name": "UFK Tools",
         "url": "https://ufktools.com",
         "logo": "https://ufktools.com/globe.svg",
+        "telephone": "+923338600011",
+        "email": "ufk.channel@gmail.com",
         "sameAs": ["https://youtube.com/@ufk"],
+        "contactPoint": [
+          {
+            "@type": "ContactPoint",
+            "telephone": "+923338600011",
+            "contactType": "customer service",
+            "availableLanguage": ["English", "Urdu"],
+          },
+        ],
       },
     ],
   };

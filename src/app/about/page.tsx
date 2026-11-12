@@ -83,6 +83,23 @@ export default function AboutPage() {
           </div>
         </div>
 
+        {/* Contact & Support Section */}
+        <div className="rounded-3xl bg-white p-8 sm:p-10 border border-slate-200 shadow-sm mb-12 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="space-y-1 text-center sm:text-left">
+            <h3 className="text-xl font-bold text-slate-900">Have Questions or Need Help?</h3>
+            <p className="text-sm text-slate-600">
+              Reach our support team via Phone (0333 8600011), WhatsApp, or Email (ufk.channel@gmail.com).
+            </p>
+          </div>
+          <Link
+            href="/contact"
+            className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 px-6 py-3 text-sm font-bold text-white transition-all shadow-md shadow-blue-600/20"
+          >
+            <span>Contact Us</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
         {/* Back Link */}
         <div className="text-center">
           <Link

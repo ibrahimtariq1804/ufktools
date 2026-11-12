@@ -59,7 +59,6 @@ const CURRENCIES: CurrencyInfo[] = [
   { code: "KRW", name: "South Korean Won", symbol: "₩", flag: "🇰🇷" },
   { code: "HKD", name: "Hong Kong Dollar", symbol: "HK$", flag: "🇭🇰" },
   { code: "TWD", name: "New Taiwan Dollar", symbol: "NT$", flag: "🇹🇼" },
-  { code: "ILS", name: "Israeli New Shekel", symbol: "₪", flag: "🇮🇱" },
   { code: "EGP", name: "Egyptian Pound", symbol: "E£", flag: "🇪🇬" },
 ];
 

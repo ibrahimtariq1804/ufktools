@@ -33,7 +33,6 @@ const FALLBACK_USD_RATES: Record<string, number> = {
   KRW: 1378.0,
   HKD: 7.82,
   TWD: 32.45,
-  ILS: 3.72,
   EGP: 47.9,
 };
 
@@ -94,6 +93,7 @@ export async function GET(request: Request) {
           ...data.rates,
           USD: 1.0,
         };
+        delete mergedRates.ILS;
 
         memoryCache = {
           rates: mergedRates,
@@ -134,6 +134,7 @@ export async function GET(request: Request) {
         USD: 1.0,
         ...data.rates,
       };
+      delete mergedRates.ILS;
 
       memoryCache = {
         rates: mergedRates,

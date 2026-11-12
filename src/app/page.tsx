@@ -45,6 +45,7 @@ export default async function HomePage() {
         youtubeUrl: post.youtubeUrl,
         publishedAt: post.publishedAt,
         isFeatured: post.isFeatured,
+        likes: post.likes ?? 0,
       }
     : null;
 

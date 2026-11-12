@@ -9,8 +9,10 @@ import {
   Zap,
   Lock,
   ArrowUpRight,
+  Phone,
+  Mail,
 } from "lucide-react";
-import { YoutubeIcon } from "@/components/ui/BrandIcons";
+import { YoutubeIcon, WhatsAppIcon } from "@/components/ui/BrandIcons";
 import { CATEGORIES } from "@/config/tools.config";
 
 export function Footer() {
@@ -72,9 +74,9 @@ export function Footer() {
 
       {/* Main Multi-Column Footer */}
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-5">
           {/* Column 1: Brand & Bio */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2.5">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-500 text-white shadow-lg shadow-blue-500/20">
                 <Wrench className="h-5 w-5" />
@@ -83,18 +85,18 @@ export function Footer() {
                 UFK <span className="text-blue-500">TOOLS</span>
               </span>
             </Link>
-            <p className="text-sm leading-relaxed text-slate-400 max-w-sm">
-              All the online tools you need in one place. Convert, compress, edit, create and manage your documents with free, privacy-first utilities designed for everyone.
+            <p className="text-sm leading-relaxed text-slate-400">
+              All the online tools you need in one place. Convert, compress, edit, create and manage documents with free, privacy-first utilities.
             </p>
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-3 pt-1">
               <a
                 href="https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-xl bg-slate-800 hover:bg-red-600/20 hover:text-red-400 border border-slate-700 hover:border-red-500/40 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-all duration-200"
+                className="flex items-center gap-2 rounded-xl bg-slate-800 hover:bg-red-600/20 hover:text-red-400 border border-slate-700 hover:border-red-500/40 px-3 py-2 text-xs font-semibold text-slate-300 transition-all duration-200"
               >
                 <YoutubeIcon className="h-4 w-4 text-red-500" />
-                <span>UFK Channel on YouTube</span>
+                <span>UFK on YouTube</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
@@ -124,11 +126,6 @@ export function Footer() {
               <li>
                 <Link href="/tools/cv-builder" className="hover:text-white transition-colors">
                   Make Your Resume / CV
-                </Link>
-              </li>
-              <li>
-                <Link href="/tools/jpg-to-pdf" className="hover:text-white transition-colors">
-                  JPG to PDF
                 </Link>
               </li>
               <li>
@@ -163,7 +160,54 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Column 4: Platform & Legal */}
+          {/* Column 4: Contact & Help */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 mb-4">
+              Contact & Support
+            </h4>
+            <ul className="space-y-3 text-sm">
+              <li>
+                <a
+                  href="tel:03338600011"
+                  className="flex items-center gap-2.5 hover:text-white transition-colors group"
+                >
+                  <Phone className="h-4 w-4 text-blue-400 group-hover:text-blue-300 shrink-0" />
+                  <span className="font-semibold text-slate-300 group-hover:text-white">0333 8600011</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://wa.me/923338600011"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2.5 hover:text-emerald-400 transition-colors group"
+                >
+                  <WhatsAppIcon className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+                  <span className="font-semibold text-slate-300 group-hover:text-emerald-400">WhatsApp: 0333 8600011</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="mailto:ufk.channel@gmail.com"
+                  className="flex items-center gap-2.5 hover:text-white transition-colors group break-all"
+                >
+                  <Mail className="h-4 w-4 text-rose-400 group-hover:text-rose-300 shrink-0" />
+                  <span className="text-xs text-slate-300 group-hover:text-white">ufk.channel@gmail.com</span>
+                </a>
+              </li>
+              <li className="pt-1">
+                <Link
+                  href="/contact"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  <span>Help & Contact Page</span>
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Column 5: Company & Legal */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 mb-4">
               Company & Legal
@@ -172,6 +216,11 @@ export function Footer() {
               <li>
                 <Link href="/about" className="hover:text-white transition-colors">
                   About UFK Tools
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-white transition-colors">
+                  Contact Us
                 </Link>
               </li>
               <li>

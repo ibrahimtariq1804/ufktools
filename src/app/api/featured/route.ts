@@ -19,6 +19,7 @@ export async function GET(request: Request) {
             youtubeUrl: p.youtubeUrl,
             publishedAt: p.publishedAt,
             isFeatured: p.isFeatured,
+            likes: p.likes ?? 0,
           }
         : null;
 

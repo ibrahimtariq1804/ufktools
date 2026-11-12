@@ -125,6 +125,15 @@ export function Header() {
                 About
               </Link>
 
+              <Link
+                href="/contact"
+                className={`px-3 py-2 rounded-lg transition-colors hover:text-blue-600 hover:bg-slate-50 ${
+                  pathname === "/contact" ? "text-blue-600 font-semibold bg-blue-50/50" : ""
+                }`}
+              >
+                Contact
+              </Link>
+
               {/* Build Your Professional CV Button — on the right of ABOUT and left of search */}
               <Link
                 href="/tools/cv-builder"
@@ -215,6 +224,13 @@ export function Header() {
                 className="block px-3 py-2 text-base font-medium text-slate-800 rounded-lg hover:bg-slate-50"
               >
                 About UFK Tools
+              </Link>
+              <Link
+                href="/contact"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block px-3 py-2 text-base font-medium text-slate-800 rounded-lg hover:bg-slate-50"
+              >
+                Contact & Support
               </Link>
 
               {/* Build Professional CV in mobile menu */}

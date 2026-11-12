@@ -10,8 +10,18 @@ import {
   Radio,
   ExternalLink,
   ShieldCheck,
+  Heart,
+  Share2,
+  Copy,
+  Check,
+  CheckCircle2,
 } from "lucide-react";
-import { YoutubeIcon } from "@/components/ui/BrandIcons";
+import {
+  YoutubeIcon,
+  FacebookIcon,
+  XTwitterIcon,
+  InstagramIcon,
+} from "@/components/ui/BrandIcons";
 import { FeaturedPost } from "./useFeaturedPost";
 
 const FALLBACK_IMAGE =
@@ -29,6 +39,37 @@ export function PictureOfTheDayClient({
   const [featuredPost, setFeaturedPost] = useState<FeaturedPost | null>(initialFeaturedPost);
   const [pastPosts, setPastPosts] = useState<FeaturedPost[]>(initialPastPosts);
   const [isLoading, setIsLoading] = useState<boolean>(!initialFeaturedPost);
+
+  // Likes tracking
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const [localLikes, setLocalLikes] = useState<Record<string, number>>({});
+
+  // Share UI states
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Initialize liked state from localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = localStorage.getItem("ufk_liked_posts_map");
+      if (stored) {
+        setLikedPosts(JSON.parse(stored));
+      }
+    } catch {}
+  }, []);
+
+  // Sync initial likes
+  useEffect(() => {
+    const map: Record<string, number> = {};
+    if (featuredPost) {
+      map[featuredPost.id] = featuredPost.likes ?? 0;
+    }
+    pastPosts.forEach((p) => {
+      map[p.id] = p.likes ?? 0;
+    });
+    setLocalLikes((prev) => ({ ...map, ...prev }));
+  }, [featuredPost, pastPosts]);
 
   // Live client-side data fetch & real-time SSE listener
   useEffect(() => {
@@ -54,10 +95,8 @@ export function PictureOfTheDayClient({
         });
     };
 
-    // 1. Initial live fetch to bypass any server-cached or prefetched stale state
     fetchLatest();
 
-    // 2. Real-time updates via Server-Sent Events
     let eventSource: EventSource | null = null;
     try {
       eventSource = new EventSource("/api/sse/featured-stream");
@@ -71,23 +110,95 @@ export function PictureOfTheDayClient({
           ) {
             fetchLatest();
           }
-        } catch {
-          // Ignore heartbeat or parse errors
-        }
+        } catch {}
       };
 
       eventSource.onerror = () => {
         eventSource?.close();
       };
-    } catch {
-      // Browser offline or unsupported
-    }
+    } catch {}
 
     return () => {
       isMounted = false;
       eventSource?.close();
     };
   }, []);
+
+  const handleLike = async (postId: string) => {
+    if (likedPosts[postId]) {
+      setToastMessage("You already liked this story! Thank you for the support.");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
+    // Optimistic UI update
+    setLikedPosts((prev) => {
+      const next = { ...prev, [postId]: true };
+      try {
+        localStorage.setItem("ufk_liked_posts_map", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    setLocalLikes((prev) => ({
+      ...prev,
+      [postId]: (prev[postId] || 0) + 1,
+    }));
+
+    try {
+      const res = await fetch(`/api/featured/${postId}/like`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.likes === "number") {
+          setLocalLikes((prev) => ({ ...prev, [postId]: data.likes }));
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to submit like:", err);
+    }
+  };
+
+  const shareFacebook = (post: FeaturedPost) => {
+    const url = typeof window !== "undefined" ? window.location.href : "https://ufktools.com/picture-of-the-day";
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      "_blank",
+      "noopener,noreferrer,width=600,height=500"
+    );
+  };
+
+  const shareXTwitter = (post: FeaturedPost) => {
+    const url = typeof window !== "undefined" ? window.location.href : "https://ufktools.com/picture-of-the-day";
+    const text = `Did you know? ${post.title} — Defense & aerospace intelligence by @ufk`;
+    window.open(
+      `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+      "_blank",
+      "noopener,noreferrer,width=600,height=500"
+    );
+  };
+
+  const shareInstagram = (post: FeaturedPost) => {
+    const url = typeof window !== "undefined" ? window.location.href : "https://ufktools.com/picture-of-the-day";
+    const textToCopy = `${post.title}\n\nDid You Know?\n${post.fact}\n\nExplore daily defense & aerospace facts: ${url}`;
+
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(textToCopy);
+      setToastMessage("Caption & link copied! Open Instagram to paste in your Story or DM.");
+      setTimeout(() => setToastMessage(null), 4000);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (typeof window !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href);
+      setCopiedLink(true);
+      setToastMessage("Link copied to clipboard!");
+      setTimeout(() => {
+        setCopiedLink(false);
+        setToastMessage(null), 3000;
+      }, 2500);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 sm:py-12">
@@ -102,7 +213,7 @@ export function PictureOfTheDayClient({
         </Link>
 
         {/* Page Header */}
-        <div className="mb-6 text-center sm:text-left">
+        <div className="mb-8 text-center sm:text-left">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 border border-rose-200 mb-2.5">
             <Sparkles className="h-3.5 w-3.5 fill-rose-600 text-rose-600" />
             <span>Official UFK Channel Curation</span>
@@ -115,12 +226,20 @@ export function PictureOfTheDayClient({
           </p>
         </div>
 
+        {/* Global Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-2xl bg-slate-900 text-white border border-slate-700 px-5 py-3 shadow-2xl text-xs sm:text-sm animate-in fade-in slide-in-from-bottom-3 duration-300">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+
         {/* Live Featured Item Showcase */}
         {featuredPost ? (
           <div className="rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-200 overflow-hidden mb-12 animate-in fade-in duration-300">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
               {/* Image Column */}
-              <div className="lg:col-span-7 h-80 sm:h-[28rem] lg:h-auto lg:min-h-[28rem] overflow-hidden bg-slate-900 group relative">
+              <div className="lg:col-span-7 h-80 sm:h-[30rem] lg:h-auto lg:min-h-[30rem] overflow-hidden bg-slate-900 group relative">
                 <img
                   src={featuredPost.imageUrl}
                   alt={featuredPost.title}
@@ -159,6 +278,77 @@ export function PictureOfTheDayClient({
                     <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal">
                       {featuredPost.fact}
                     </p>
+                  </div>
+
+                  {/* Like & Engagement Bar */}
+                  <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleLike(featuredPost.id)}
+                      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all shadow-sm ${
+                        likedPosts[featuredPost.id]
+                          ? "bg-rose-50 text-rose-600 border border-rose-300 ring-2 ring-rose-200/60"
+                          : "bg-white text-slate-700 border border-slate-200 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50/40"
+                      }`}
+                      title={likedPosts[featuredPost.id] ? "You liked this post" : "Like this discovery"}
+                    >
+                      <Heart
+                        className={`h-4 w-4 transition-transform active:scale-125 ${
+                          likedPosts[featuredPost.id] ? "fill-rose-500 text-rose-500" : "text-slate-400"
+                        }`}
+                      />
+                      <span>{likedPosts[featuredPost.id] ? "Liked" : "Like"}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-extrabold text-slate-700">
+                        {localLikes[featuredPost.id] ?? (featuredPost.likes || 0)}
+                      </span>
+                    </button>
+
+                    {/* Social Share Buttons */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1 hidden sm:inline">
+                        Share:
+                      </span>
+
+                      {/* Facebook */}
+                      <button
+                        type="button"
+                        onClick={() => shareFacebook(featuredPost)}
+                        title="Share on Facebook"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-xs"
+                      >
+                        <FacebookIcon className="h-4 w-4" />
+                      </button>
+
+                      {/* X / Twitter */}
+                      <button
+                        type="button"
+                        onClick={() => shareXTwitter(featuredPost)}
+                        title="Share on X (Twitter)"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-900 hover:bg-black hover:text-white transition-all shadow-xs"
+                      >
+                        <XTwitterIcon className="h-3.5 w-3.5" />
+                      </button>
+
+                      {/* Instagram */}
+                      <button
+                        type="button"
+                        onClick={() => shareInstagram(featuredPost)}
+                        title="Share on Instagram (Copies Story Caption & Link)"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white hover:opacity-90 transition-all shadow-xs"
+                      >
+                        <InstagramIcon className="h-4 w-4" />
+                      </button>
+
+                      {/* Copy Link */}
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        title="Copy direct story link"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all shadow-xs"
+                      >
+                        {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -253,7 +443,51 @@ export function PictureOfTheDayClient({
                       </p>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleLike(item.id)}
+                          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                            likedPosts[item.id]
+                              ? "bg-rose-50 text-rose-600 border border-rose-200"
+                              : "bg-slate-50 text-slate-600 hover:text-rose-600 hover:bg-rose-50"
+                          }`}
+                        >
+                          <Heart
+                            className={`h-3.5 w-3.5 ${
+                              likedPosts[item.id] ? "fill-rose-500 text-rose-500" : "text-slate-400"
+                            }`}
+                          />
+                          <span>{localLikes[item.id] ?? (item.likes || 0)}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => shareFacebook(item)}
+                          title="Share to Facebook"
+                          className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        >
+                          <FacebookIcon className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => shareXTwitter(item)}
+                          title="Share to X"
+                          className="p-1 rounded-md text-slate-400 hover:text-black hover:bg-slate-100 transition-colors"
+                        >
+                          <XTwitterIcon className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => shareInstagram(item)}
+                          title="Share to Instagram"
+                          className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        >
+                          <InstagramIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
                       <a
                         href={item.youtubeUrl || "https://youtube.com/@ufk?si=Td89kGB6O2X9L2W8"}
                         target="_blank"

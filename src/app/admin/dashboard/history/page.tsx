@@ -10,6 +10,7 @@ import {
   Check,
   PlusCircle,
   RefreshCw,
+  Heart,
 } from "lucide-react";
 import { FeaturedPostRecord } from "@/lib/db";
 
@@ -189,6 +190,10 @@ export default function HistoryPage() {
                           day: "numeric",
                           year: "numeric",
                         })}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-950/70 px-2.5 py-0.5 text-[11px] font-bold text-rose-300 border border-rose-800">
+                        <Heart className="h-3 w-3 fill-rose-500 text-rose-500" />
+                        <span>{post.likes || 0} Likes</span>
                       </span>
                     </div>
 

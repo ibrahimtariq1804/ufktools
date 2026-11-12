@@ -11,12 +11,14 @@ import {
   ArrowRight,
   RefreshCw,
   ExternalLink,
+  Heart,
 } from "lucide-react";
 import { FeaturedPostRecord } from "@/lib/db";
 
 export default function AdminDashboardPage() {
   const [featuredPost, setFeaturedPost] = useState<FeaturedPostRecord | null>(null);
   const [totalPosts, setTotalPosts] = useState<number>(0);
+  const [totalLikes, setTotalLikes] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = () => {
@@ -26,6 +28,7 @@ export default function AdminDashboardPage() {
       .then((data) => {
         const posts: FeaturedPostRecord[] = data.posts || [];
         setTotalPosts(posts.length);
+        setTotalLikes(posts.reduce((acc, p) => acc + (p.likes || 0), 0));
         const active = posts.find((p) => p.isFeatured) || posts[0] || null;
         setFeaturedPost(active);
       })
@@ -42,6 +45,7 @@ export default function AdminDashboardPage() {
         if (!ignore) {
           const posts: FeaturedPostRecord[] = data.posts || [];
           setTotalPosts(posts.length);
+          setTotalLikes(posts.reduce((acc, p) => acc + (p.likes || 0), 0));
           const active = posts.find((p) => p.isFeatured) || posts[0] || null;
           setFeaturedPost(active);
           setIsLoading(false);
@@ -104,9 +108,17 @@ export default function AdminDashboardPage() {
           <div className="text-lg font-bold text-white truncate">
             {featuredPost ? featuredPost.title : "None Selected"}
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
-            <Radio className="h-3 w-3 animate-pulse" />
-            <span>Broadcasting Live</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+              <Radio className="h-3 w-3 animate-pulse" />
+              <span>Broadcasting Live</span>
+            </div>
+            {featuredPost && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400">
+                <Heart className="h-3 w-3 fill-rose-500 text-rose-500" />
+                {featuredPost.likes || 0}
+              </span>
+            )}
           </div>
         </div>
 
@@ -122,28 +134,28 @@ export default function AdminDashboardPage() {
           <div className="text-[11px] text-slate-500">Stored in repository</div>
         </div>
 
-        {/* Card 3: Realtime Status */}
+        {/* Card 3: Total Visitor Likes */}
         <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Realtime Engine
+              Total Visitor Likes
+            </span>
+            <Heart className="h-4 w-4 text-rose-500 fill-rose-500/20" />
+          </div>
+          <div className="text-2xl font-black text-rose-400">{totalLikes}</div>
+          <div className="text-[11px] text-slate-500">Audience engagement across all posts</div>
+        </div>
+
+        {/* Card 4: Realtime Engine & Database */}
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              System Engine
             </span>
             <Radio className="h-4 w-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-black text-emerald-400">SSE Active</div>
-          <div className="text-[11px] text-slate-500">Instant visitor dispatch</div>
-        </div>
-
-        {/* Card 4: Database Storage */}
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Database
-            </span>
-            <Database className="h-4 w-4 text-purple-400" />
-          </div>
-          <div className="text-lg font-bold text-white">PostgreSQL / Local</div>
-          <div className="text-[11px] text-slate-500">Zero subscription cost</div>
+          <div className="text-lg font-bold text-emerald-400">Live SSE & Postgres</div>
+          <div className="text-[11px] text-slate-500">Zero-lag visitor synchronization</div>
         </div>
       </div>
 
@@ -177,8 +189,14 @@ export default function AdminDashboardPage() {
               />
             </div>
             <div className="md:col-span-8 space-y-3">
-              <div className="text-xs text-blue-400 font-semibold">
-                Published on {new Date(featuredPost.publishedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-xs text-blue-400 font-semibold">
+                  Published on {new Date(featuredPost.publishedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold text-xs">
+                  <Heart className="h-3 w-3 fill-rose-500 text-rose-500" />
+                  {featuredPost.likes || 0} Likes
+                </span>
               </div>
               <h3 className="text-xl sm:text-2xl font-extrabold text-white">
                 {featuredPost.title}

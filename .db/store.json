@@ -23,5 +23,41 @@
       "updatedAt": "2026-10-31T23:44:43.267Z"
     }
   ],
-  "analytics": []
+  "analytics": [
+    {
+      "id": "evt-1",
+      "eventType": "tool_action",
+      "toolSlug": "merge-pdf",
+      "action": "download_merged_pdf",
+      "createdAt": "2026-10-31T12:22:51.187Z"
+    },
+    {
+      "id": "9e7b3dd7-4e61-487b-a226-1cdde94f5216",
+      "eventType": "pageview",
+      "path": "/",
+      "countryCode": "US",
+      "city": "San Jose",
+      "region": "CA",
+      "deviceType": "desktop",
+      "browser": "Chrome",
+      "os": "Linux",
+      "referrer": "ufktools-h0vi96mbo-ibrahim-tariqs-projects-5faf8e6f.vercel.app",
+      "visitorHash": "27bcc91adf4b74ec",
+      "createdAt": "2026-10-31T12:35:22.384Z"
+    },
+    {
+      "id": "be0daaaa-154d-4cbf-9898-0bcbc7f64178",
+      "eventType": "pageview",
+      "path": "/picture-of-the-day",
+      "countryCode": "UNKNOWN",
+      "city": "Unknown",
+      "region": "Unknown",
+      "deviceType": "desktop",
+      "browser": "Chrome",
+      "os": "Windows",
+      "referrer": "localhost",
+      "visitorHash": "320c22eee54c1dd0",
+      "createdAt": "2026-11-03T13:04:30.654Z"
+    }
+  ]
 }
